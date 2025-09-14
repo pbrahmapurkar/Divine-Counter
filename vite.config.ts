@@ -3,6 +3,8 @@
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
 
+  const useCapStubs = process.env.CAP_USE_STUBS !== 'false';
+
   export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -46,6 +48,12 @@
         '@radix-ui/react-aspect-ratio@1.1.2': '@radix-ui/react-aspect-ratio',
         '@radix-ui/react-alert-dialog@1.1.6': '@radix-ui/react-alert-dialog',
         '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
+        // Capacitor plugin stubs so web build works without native plugins
+        ...(useCapStubs ? {
+          '@capacitor/preferences': path.resolve(__dirname, './src/capacitor-stubs/preferences.ts'),
+          '@capacitor/local-notifications': path.resolve(__dirname, './src/capacitor-stubs/local-notifications.ts'),
+          '@capacitor/app': path.resolve(__dirname, './src/capacitor-stubs/app.ts'),
+        } : {}),
         '@': path.resolve(__dirname, './src'),
       },
     },

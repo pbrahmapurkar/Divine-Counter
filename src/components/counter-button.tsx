@@ -1,5 +1,6 @@
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { cn } from './ui/utils';
+import { useState, useRef } from 'react';
 
 interface CounterButtonProps {
   count: number;
@@ -16,6 +17,47 @@ export function CounterButton({
   disabled = false,
   className 
 }: CounterButtonProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleIncrement = () => {
+    onIncrement();
+  };
+
+  const handleDecrement = () => {
+    if (count <= 0) return;
+    onDecrement();
+  };
+
+  // Gesture handling
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setTouchStart({ x: touch.clientX, y: touch.clientY });
+    setTouchEnd(null);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setTouchEnd({ x: touch.clientX, y: touch.clientY });
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const deltaX = touchEnd.x - touchStart.x;
+    const deltaY = touchEnd.y - touchStart.y;
+    
+    // Check for downward swipe (decrement gesture)
+    if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY > 50) {
+      handleDecrement();
+    }
+    
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
   return (
     <motion.button
       className={cn(
@@ -24,10 +66,16 @@ export function CounterButton({
         "hover:shadow-xl hover:border-primary/40 disabled:opacity-50 disabled:cursor-not-allowed",
         className
       )}
-      onClick={onIncrement}
+      ref={buttonRef}
+      onClick={handleIncrement}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       disabled={disabled}
       whileTap={{ scale: 0.95 }}
       whileHover={{ scale: 1.02 }}
+      animate={prefersReducedMotion || disabled ? undefined : { scale: [1, 1.015, 1] }}
+      transition={prefersReducedMotion || disabled ? undefined : { duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
     >
       {/* Lotus pattern background */}
       <div className="absolute inset-0 flex items-center justify-center opacity-10">
@@ -51,10 +99,7 @@ export function CounterButton({
         </div>
       </div>
 
-      {/* Swipe indicator */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-xs text-muted-foreground">
-        ⬇ swipe to -1
-      </div>
+      {/* Removed swipe hint; a dedicated -1 button is shown elsewhere */}
     </motion.button>
   );
 }
