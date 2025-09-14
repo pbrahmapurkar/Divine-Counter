@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronLeft, Check, Sparkles, User } from 'lucide-react';
 import { DivineLogo } from './divine-logo';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
+import { StableInput } from './ui/stable-input';
 import { Label } from './ui/label';
+import { Switch } from './ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+// removed dialog usage from this screen
+import { NumberField } from './ui/number-field';
+import { CyclePicker } from './counter-cycle/CyclePicker';
 import { cn } from './ui/utils';
+import Step4CreateCounter from './onboarding/steps/Step4CreateCounter';
 
 interface Counter {
   id: string;
@@ -41,26 +48,77 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
   const [userName, setUserName] = useState('');
   const [cycleSize, setCycleSize] = useState(108);
   const [customCycleSize, setCustomCycleSize] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [cycleError, setCycleError] = useState<string | null>(null);
+  const [targetError, setTargetError] = useState<string | null>(null);
   const [counter, setCounter] = useState<Partial<Counter>>({
     name: 'My Practice',
-    color: '#F2994A',
+    color: '#34C759',
     cycleSize: 108,
     target: 1
   });
   const [settings, setSettings] = useState({
     theme: 'spiritual'
   });
+  const [counterNameError, setCounterNameError] = useState<string | null>(null);
+  // removed modal-based custom target; using direct number entry
+  // Reminder frequency: daily or weekly, and selected days for weekly
+  // reminders removed
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const colorGroupRef = useRef<HTMLDivElement>(null);
 
   const steps = [
     'Welcome',
     'Your Name',
     'Choose Your Cycle',
     'Create Your Counter',
-    'Background',
     'Review'
   ];
 
+  // TEMP: mount log to detect unwanted remounts while typing/tapping
+  useEffect(() => { console.log('MOUNT <Onboarding>'); }, []);
+
+  const validateName = () => {
+    const n = (userName || '').trim();
+    if (n.length < 1) return 'Please enter your name (1–40 characters).';
+    if (n.length > 40) return 'Name should be at most 40 characters.';
+    return null;
+  };
+
+  const validateCycle = () => {
+    if (cycleSize === 0) {
+      const v = parseInt(customCycleSize || '');
+      if (!customCycleSize) return 'Enter a custom cycle count.';
+      if (!Number.isFinite(v) || v < 1) return 'Cycle must be a number ≥ 1.';
+    }
+    return null;
+  };
+
+  const validateTarget = () => {
+    const t = Number(counter.target ?? 0);
+    if (!Number.isFinite(t) || t < 0) return 'Daily target must be ≥ 0.';
+    return null;
+  };
+
   const nextStep = () => {
+    // Per-step validation before proceeding
+    if (step === 1) {
+      const err = validateName();
+      setNameError(err);
+      if (err) return;
+    }
+    if (step === 2) {
+      const err = validateCycle();
+      setCycleError(err);
+      if (err) return;
+    }
+    if (step === 3) {
+      const errN = (counter.name || '').trim().length === 0 ? 'Counter name is required.' : null;
+      const errT = validateTarget();
+      setTargetError(errT || errN);
+      if (errN || errT) return;
+    }
+
     if (step < steps.length - 1) {
       setStep(step + 1);
       // Update counter cycle size when moving from cycle step
@@ -74,10 +132,10 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
         userName: userName || 'Friend',
         counter: {
           id: '1',
-          name: counter.name || 'My Practice',
+          name: (counter.name || 'My Practice').trim().slice(0,40),
           color: counter.color || '#F2994A',
           cycleSize: finalCycleSize,
-          target: counter.target || 1
+          target: Math.max(0, Number(counter.target) || 0)
         },
         settings
       });
@@ -96,10 +154,11 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
         <motion.div
           key={index}
           className={cn(
-            "w-2 h-2 rounded-full transition-colors",
-            index <= step ? "bg-primary" : "bg-muted"
+            "progress-dot",
+            index < step && "completed",
+            index === step && "active"
           )}
-          initial={{ scale: 0 }}
+          initial={false}
           animate={{ scale: 1 }}
           transition={{ delay: index * 0.1 }}
         />
@@ -112,7 +171,7 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
       case 0:
         return (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             className="text-center space-y-6"
           >
@@ -134,29 +193,57 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
       case 1:
         return (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
             <div className="text-center">
               <User size={48} className="mx-auto text-primary mb-4" />
-              <h2 className="text-2xl font-bold text-foreground mb-2">Your Name</h2>
-              <p className="text-muted-foreground">
+              <h2 className="text-2xl font-bold text-foreground mb-1">Your Name</h2>
+              <p className="text-sm text-muted-foreground">
                 How would you like to be addressed?
               </p>
             </div>
-            
+
             <Card>
               <CardContent className="pt-6">
-                <div>
-                  <Label htmlFor="user-name">Name</Label>
-                  <Input
+                <div className="space-y-2">
+                  <Label htmlFor="user-name" className="sr-only">Your Name</Label>
+                  <StableInput
                     id="user-name"
+                    aria-label="Your name"
+                    aria-describedby="user-name-help"
                     value={userName}
-                    onChange={(e) => setUserName(e.target.value)}
-                    placeholder="Enter your name"
-                    className="text-center text-lg"
+                    onChange={(v) => {
+                      setUserName(v);
+                      if (nameError) setNameError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const err = validateName();
+                        setNameError(err);
+                        if (!err) nextStep();
+                      }
+                    }}
+                    placeholder="e.g., Arjun"
+                    className="text-center text-lg h-12"
+                    inputMode="text"
+                    autoCapitalize="words"
+                    autoComplete="name"
+                    spellCheck={false}
+                    autoFocus
+                    aria-invalid={!!nameError}
+                    maxLength={40}
                   />
+                  <div className="flex items-center justify-between text-xs">
+                    <span id="user-name-help" className="text-muted-foreground">1–40 characters</span>
+                    <span className={cn("", (userName || '').trim().length === 40 ? 'text-primary' : 'text-muted-foreground')}>
+                      {(userName || '').trim().length}/40
+                    </span>
+                  </div>
+                  {nameError && (
+                    <p className="mt-1 text-xs text-destructive" role="alert" aria-live="polite">{nameError}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -165,242 +252,57 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
 
       case 2:
         return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
+          <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-foreground mb-2">Choose Your Cycle</h2>
-              <p className="text-muted-foreground">
-                A maala completes at this count
-              </p>
+              <p className="text-sm text-muted-foreground">A maala completes at this count</p>
             </div>
-            
-            <div className="space-y-3">
-              {[
-                { size: 108, label: '108', desc: 'Traditional full maala' },
-                { size: 54, label: '54', desc: 'Half maala' }
-              ].map((option) => (
-                <motion.button
-                  key={option.size}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 text-left transition-all",
-                    cycleSize === option.size 
-                      ? "border-primary bg-primary/5" 
-                      : "border-border bg-card hover:border-primary/50"
-                  )}
-                  onClick={() => setCycleSize(option.size)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-foreground">{option.label}</div>
-                      <div className="text-sm text-muted-foreground">{option.desc}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-primary">{option.size}</div>
-                      <div className="text-xs text-muted-foreground">counts</div>
-                    </div>
-                  </div>
-                </motion.button>
-              ))}
-              
-              {/* Custom option */}
-              <motion.div
-                className={cn(
-                  "w-full p-4 rounded-xl border-2 transition-all",
-                  cycleSize === 0 
-                    ? "border-primary bg-primary/5" 
-                    : "border-border bg-card hover:border-primary/50"
-                )}
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <button
-                      className="font-semibold text-foreground text-left"
-                      onClick={() => setCycleSize(0)}
-                    >
-                      Custom
-                    </button>
-                    <div className="text-sm text-muted-foreground">Enter your preferred count</div>
-                  </div>
-                  <div className="w-20">
-                    {cycleSize === 0 && (
-                      <Input
-                        type="number"
-                        value={customCycleSize}
-                        onChange={(e) => setCustomCycleSize(e.target.value)}
-                        placeholder="108"
-                        className="text-center text-sm"
-                        min="1"
-                        max="1000"
-                      />
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            </div>
+            <CyclePicker
+              selected={cycleSize === 0 ? (customCycleSize ? Number(customCycleSize) : null) : cycleSize}
+              onChange={(v) => {
+                const presetValues = [108,54,27,21];
+                if (presetValues.includes(v)) {
+                  setCycleSize(v);
+                  setCustomCycleSize('');
+                } else {
+                  setCycleSize(0);
+                  setCustomCycleSize(String(v));
+                }
+                if (cycleError) setCycleError(null);
+              }}
+              min={1}
+              max={1000}
+            />
           </motion.div>
         );
 
       case 3:
         return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Create Your Counter</h2>
-              <p className="text-muted-foreground">
-                Personalize your first counting practice
-              </p>
-            </div>
-
-            <Card>
-              <CardContent className="space-y-4 pt-6">
-                <div>
-                  <Label htmlFor="counter-name">Mantra/Name</Label>
-                  <Input
-                    id="counter-name"
-                    value={counter.name}
-                    onChange={(e) => setCounter(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="My Practice"
-                  />
-                </div>
-
-                <div>
-                  <Label>Color/Icon</Label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {colors.map((color) => (
-                      <button
-                        key={color.value}
-                        className={cn(
-                          "p-3 rounded-lg border-2 transition-all",
-                          counter.color === color.value 
-                            ? "border-primary" 
-                            : "border-border hover:border-primary/50"
-                        )}
-                        onClick={() => setCounter(prev => ({ ...prev, color: color.value }))}
-                      >
-                        <div 
-                          className="w-6 h-6 rounded-full mx-auto mb-1"
-                          style={{ backgroundColor: color.value }}
-                        />
-                        <div className="text-xs text-muted-foreground">{color.name}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="daily-target">Daily Target (maalas)</Label>
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                    {[1, 2, 3, 5].map((target) => (
-                      <button
-                        key={target}
-                        className={cn(
-                          "p-3 rounded-lg border-2 transition-all text-center",
-                          counter.target === target 
-                            ? "border-primary bg-primary/5" 
-                            : "border-border hover:border-primary/50"
-                        )}
-                        onClick={() => setCounter(prev => ({ ...prev, target }))}
-                      >
-                        <div className="font-bold text-foreground">{target}</div>
-                        <div className="text-xs text-muted-foreground">maala{target !== 1 ? 's' : ''}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="reminder">Reminder (optional)</Label>
-                  <Input
-                    id="reminder"
-                    type="time"
-                    defaultValue="09:00"
-                    className="mt-1"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Live Preview Card */}
-            <Card className="border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-4 h-4 rounded-full border border-border"
-                    style={{ backgroundColor: counter.color }}
-                  />
-                  <div className="flex-1">
-                    <div className="font-semibold text-foreground">{counter.name || 'My Practice'}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {cycleSize === 0 ? (customCycleSize || '108') : cycleSize} count cycle • {counter.target} maala{counter.target !== 1 ? 's' : ''} daily
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Step4CreateCounter
+            data={{
+              counterName: String(counter.name || ''),
+              color: String(counter.color || '#34C759'),
+              customColor: undefined,
+              cycleSize: (cycleSize === 0 ? (parseInt(customCycleSize||'108')||108) : cycleSize),
+              target: Number(counter.target ?? 1),
+            }}
+            update={(patch)=>{
+              if (patch.counterName!=null) setCounter(prev=> ({...prev, name: patch.counterName!}));
+              if (patch.color!=null) setCounter(prev=> ({...prev, color: patch.color!}));
+              if (patch.target!=null) setCounter(prev=> ({...prev, target: patch.target!}));
+            }}
+            next={({ counterName, target })=>{
+              setCounter(prev=> ({...prev, name: counterName, target }));
+              nextStep();
+            }}
+            back={prevStep}
+          />
         );
 
       case 4:
         return (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Background</h2>
-              <p className="text-muted-foreground">
-                Choose your preferred background style
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                { id: 'plain', label: 'Plain', desc: 'Clean minimal background' },
-                { id: 'gradient', label: 'Gradient', desc: 'Subtle color transitions' },
-                { id: 'image', label: 'Image', desc: 'Nature-inspired backdrop' }
-              ].map((option) => (
-                <motion.button
-                  key={option.id}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 text-left transition-all",
-                    "border-border bg-card hover:border-primary/50"
-                  )}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-foreground">{option.label}</div>
-                      <div className="text-sm text-muted-foreground">{option.desc}</div>
-                    </div>
-                  </div>
-                </motion.button>
-              ))}
-            </div>
-            
-            <div className="text-xs text-muted-foreground text-center">
-              Legibility overlay will be applied automatically
-            </div>
-          </motion.div>
-        );
-
-      case 5:
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             className="text-center space-y-6"
           >
@@ -474,6 +376,7 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
         </AnimatePresence>
       </div>
 
+      {step !== 3 && (
       <div className="flex gap-3 mt-8">
         {step > 0 && (
           <Button
@@ -489,9 +392,12 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
         <Button
           onClick={nextStep}
           className="flex-1"
+          variant={step === 0 || step === steps.length - 1 ? 'primaryGradient' : undefined}
+          size="lg"
           disabled={
             (step === 1 && !userName.trim()) ||
-            (step === 2 && cycleSize === 0 && (!customCycleSize || parseInt(customCycleSize) < 1))
+            (step === 2 && ((cycleSize === 0 && (!customCycleSize || parseInt(customCycleSize) < 1)) || (cycleSize !== 0 && cycleSize < 1))) ||
+            (step === 3 && !((counter.name || '').trim().length >= 1 && (counter.name || '').trim().length <= 32))
           }
         >
           {step === 0 ? (
@@ -512,6 +418,7 @@ export function Onboarding({ onComplete, onSkip }: OnboardingProps) {
           )}
         </Button>
       </div>
+      )}
     </div>
   );
 }
