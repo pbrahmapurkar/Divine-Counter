@@ -1,7 +1,7 @@
 
-  # Jappa Counter App Design
+  # Mantra Counting App Design (Community)
 
-  This is a code bundle for Jappa Counter App Design. The original project is available at https://www.figma.com/design/xVjFRX0a4jQGYXuX2uasLs/Jappa-Counter-App-Design.
+  This is a code bundle for Mantra Counting App Design (Community). The original project is available at https://www.figma.com/design/e8Y2YZdSYJvQHSpX7wxoVL/Mantra-Counting-App-Design--Community-.
 
   ## Running the code
 

@@ -1,156 +1,24 @@
 {
-  "name": "Divine Counter - Spiritual Practice Tracker",
+  "name": "Divine Counter",
   "short_name": "Divine Counter",
-  "description": "A sacred space for your spiritual counting practice. Track maalas, build consistency, and deepen your spiritual journey.",
+  "description": "Your mindful companion for spiritual practice",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a1a",
-  "theme_color": "#F2994A",
-  "orientation": "portrait",
-  "scope": "/",
-  "lang": "en",
-  "categories": ["lifestyle", "productivity", "health"],
+  "background_color": "#FDF6E3",
+  "theme_color": "#D4AF37",
   "icons": [
     {
-      "src": "/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-192x192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
-      "src": "/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-512x512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Start Practice",
-      "short_name": "Practice",
-      "description": "Quickly start your spiritual practice",
-      "url": "/?action=start",
-      "icons": [
-        {
-          "src": "/shortcut-practice.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "View Progress",
-      "short_name": "Progress",
-      "description": "Check your practice progress",
-      "url": "/history",
-      "icons": [
-        {
-          "src": "/shortcut-progress.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "Add Counter",
-      "short_name": "Add",
-      "description": "Create a new practice counter",
-      "url": "/counters?action=add",
-      "icons": [
-        {
-          "src": "/shortcut-add.png",
-          "sizes": "96x96"
-        }
-      ]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshot-mobile-1.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Main counter interface"
-    },
-    {
-      "src": "/screenshot-mobile-2.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Progress tracking"
-    },
-    {
-      "src": "/screenshot-mobile-3.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Counter library"
-    }
-  ],
-  "related_applications": [],
-  "prefer_related_applications": false,
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "launch_handler": {
-    "client_mode": "navigate-existing"
-  },
-  "protocol_handlers": [
-    {
-      "protocol": "web+divinecounter",
-      "url": "/?action=%s"
-    }
-  ],
-  "file_handlers": [
-    {
-      "action": "/import",
-      "accept": {
-        "application/json": [".json"]
-      }
-    }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+  ]
 }
+
+
+
