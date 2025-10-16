@@ -1003,8 +1003,9 @@ export default function App() {
       />
       
       {/* Volume Button Tester - For Emulator/Web Testing */}
+      {console.log("🔍 Debug: currentScreen =", currentScreen, ", volumeKeyControl =", settings.volumeKeyControl)}
       <VolumeButtonTester
-        enabled={settings.volumeKeyControl && currentScreen === "home"}
+        enabled={settings.volumeKeyControl}
         onVolumeUp={handleIncrement}
         onVolumeDown={handleDecrement}
       />
