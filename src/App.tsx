@@ -645,70 +645,32 @@ export default function App() {
       return;
     }
 
-    let isActive = true;
-    let VolumeControl: any = null;
-    let listener: any = null;
+    console.log("🔧 Setting up volume key control via direct bridge...");
 
-    const setupVolumeControl = async () => {
-      try {
-        console.log("🔧 Setting up volume key control...");
-        const module = await import("./plugins/VolumeControl");
-        VolumeControl = module.default;
-
-        if (!isActive) {
-          return;
-        }
-
-        // Enable the plugin
-        await VolumeControl.enable();
-        console.log("✅ Volume control plugin enabled");
-
-        // Add event listener
-        listener = await VolumeControl.addListener('volumeButtonPressed', (event: { direction: 'up' | 'down' }) => {
-          if (!isActive) {
-            return;
-          }
-
-          if (event.direction === "up") {
-            console.log("🔼 Volume UP pressed - incrementing count");
-            toast.success("🔼 Volume UP");
-            handleIncrement();
-          } else if (event.direction === "down") {
-            console.log("🔽 Volume DOWN pressed - decrementing count");
-            toast.success("🔽 Volume DOWN");
-            handleDecrement();
-          }
-        });
-
-        console.log("✅ Volume buttons listener started successfully!");
-        console.log("📱 Press Volume UP to increment, Volume DOWN to decrement");
-      } catch (error) {
-        console.error("❌ Failed to set up volume key control:", error);
-        toast.error("Failed to enable volume button control. Check console for details.");
+    // Listen to custom events dispatched from native Android
+    const handleVolumeButton = (event: any) => {
+      const direction = event.detail?.direction;
+      
+      if (direction === "up") {
+        console.log("🔼 Volume UP pressed - incrementing count");
+        toast.success("🔼 Volume UP");
+        handleIncrement();
+      } else if (direction === "down") {
+        console.log("🔽 Volume DOWN pressed - decrementing count");
+        toast.success("🔽 Volume DOWN");
+        handleDecrement();
       }
     };
 
-    setupVolumeControl();
+    window.addEventListener('volumebutton', handleVolumeButton);
+    console.log("✅ Volume button listener registered!");
+    console.log("📱 Press Volume UP to increment, Volume DOWN to decrement");
 
     return () => {
-      isActive = false;
-
-      (async () => {
-        try {
-          if (listener) {
-            await listener.remove();
-            console.log("🛑 Volume key control listener removed");
-          }
-
-          if (VolumeControl) {
-            await VolumeControl.disable();
-            console.log("🛑 Volume key control disabled");
-          }
-        } catch (error) {
-          console.error("❌ Failed to clean up volume key control:", error);
-        }
-      })();
+      window.removeEventListener('volumebutton', handleVolumeButton);
+      console.log("🛑 Volume button listener removed");
     };
+  }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
   }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
 
   const resetCurrentCount = useCallback(() => {
