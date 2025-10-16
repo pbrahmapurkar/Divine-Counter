@@ -4,11 +4,5 @@
   "webDir": "build",
   "server": {
     "androidScheme": "https"
-  },
-  "plugins": {
-    "VolumeButtons": {
-      "disableSystemVolumeHandler": true,
-      "suppressVolumeIndicator": true
-    }
   }
 }
