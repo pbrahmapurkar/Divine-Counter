@@ -631,17 +631,17 @@ export default function App() {
 
   useEffect(() => {
     if (!settings.volumeKeyControl) {
-      console.debug("Volume key control is disabled");
+      console.log("✋ Volume key control is disabled");
       return;
     }
 
     if (!activeCounterId) {
-      console.debug("Volume key control requires an active counter");
+      console.log("⚠️ Volume key control requires an active counter");
       return;
     }
 
     if (!Capacitor.isNativePlatform()) {
-      console.debug("Volume key control is only available on a native device");
+      console.log("🌐 Volume key control is only available on native Android/iOS devices");
       return;
     }
 
@@ -651,7 +651,7 @@ export default function App() {
 
     const setupVolumeControl = async () => {
       try {
-        console.debug("Setting up volume key control...");
+        console.log("🔧 Setting up volume key control...");
         modulePromise = import("@capacitor-community/volume-buttons");
         const module = await modulePromise;
         volumeButtons = module.VolumeButtons;
@@ -664,10 +664,10 @@ export default function App() {
           const status = await volumeButtons.isWatching();
           if (status.value) {
             await volumeButtons.clearWatch();
-            console.debug("Existing volume key control watcher cleared before re-initializing");
+            console.log("🔄 Existing volume key control watcher cleared before re-initializing");
           }
         } catch (statusError) {
-          console.debug("Unable to verify existing volume key control watcher", statusError);
+          console.log("⚠️ Unable to verify existing volume key control watcher", statusError);
         }
 
         await volumeButtons.watchVolume({ suppressVolumeIndicator: true }, (event) => {
@@ -676,17 +676,19 @@ export default function App() {
           }
 
           if (event.direction === "up") {
-            console.debug("Volume UP pressed - incrementing count");
+            console.log("🔼 Volume UP pressed - incrementing count");
             handleIncrement();
           } else if (event.direction === "down") {
-            console.debug("Volume DOWN pressed - decrementing count");
+            console.log("🔽 Volume DOWN pressed - decrementing count");
             handleDecrement();
           }
         });
 
-        console.debug("Volume buttons watcher started successfully");
+        console.log("✅ Volume buttons watcher started successfully!");
+        console.log("📱 Press Volume UP to increment, Volume DOWN to decrement");
       } catch (error) {
-        console.error("Failed to set up volume key control", error);
+        console.error("❌ Failed to set up volume key control:", error);
+        toast.error("Failed to enable volume button control. Check console for details.");
       }
     };
 
@@ -710,16 +712,16 @@ export default function App() {
 
           try {
             await buttons.clearWatch();
-            console.debug("Volume key control watcher cleared");
+            console.log("🛑 Volume key control watcher cleared");
           } catch (error) {
             if (error instanceof Error && error.message.includes("not been been watched")) {
-              console.debug("Volume key control watcher was already cleared");
+              console.log("ℹ️ Volume key control watcher was already cleared");
               return;
             }
             throw error;
           }
         } catch (error) {
-          console.error("Failed to clean up volume key control", error);
+          console.error("❌ Failed to clean up volume key control:", error);
         }
       })();
     };
