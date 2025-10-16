@@ -798,7 +798,30 @@ export default function App() {
     await cancelReminderForCounter(id);
     toast.success("Practice deleted");
   }, [cancelReminderForCounter, counters, activeCounterId]);
-  const handleSettingToggle = (setting: keyof Settings) => { setSettings(prev => ({ ...prev, [setting]: !prev[setting] })); };
+  const handleSettingToggle = (setting: keyof Settings) => { 
+    setSettings(prev => {
+      const newValue = !prev[setting];
+      
+      // Show feedback for volume key control
+      if (setting === "volumeKeyControl") {
+        if (Capacitor.isNativePlatform()) {
+          toast.success(
+            newValue 
+              ? "Volume buttons enabled! Use volume keys to count." 
+              : "Volume buttons disabled.",
+            { duration: 3000 }
+          );
+        } else {
+          toast.info(
+            "Volume button control only works on Android/iOS devices. Build and deploy to test this feature.",
+            { duration: 5000 }
+          );
+        }
+      }
+      
+      return { ...prev, [setting]: newValue };
+    });
+  };
   const handleResetTutorial = useCallback(() => {
     const storageKeys = [
       "divine-counter-onboarded",
