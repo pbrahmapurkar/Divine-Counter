@@ -1,0 +1,14 @@
+{
+  "appId": "com.divinecounter.app",
+  "appName": "Divine Counter: Prayer Beads",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "VolumeButtons": {
+      "disableSystemVolumeHandler": true,
+      "suppressVolumeIndicator": true
+    }
+  }
+}

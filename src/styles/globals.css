@@ -1,120 +1,83 @@
 @custom-variant dark (&:is(.dark *));
 
-/* Spiritual Saffron/Orange Theme (Default) - Based on uploaded logo */
 :root {
   --font-size: 16px;
-  --background: #FFFBF5;
-  --foreground: #2D1810;
-  --card: #FFFFFF;
-  --card-foreground: #2D1810;
-  --popover: #FFFFFF;
-  --popover-foreground: #2D1810;
-  --primary: #F2994A;
-  --primary-dark: #E67C32;
-  --primary-light: #FFE8D6;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F2C94C;
-  --secondary-foreground: #2D1810;
-  --muted: #FAF6F0;
-  --muted-foreground: #8B7355;
-  --text-secondary: #6B7280;
-  --text-muted: #9CA3AF;
-  --accent: #FFF7E6;
-  --accent-foreground: #2D1810;
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #FF8C42;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-foreground: #030213;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #FFF4F0;
+  --accent-foreground: #030213;
+  --saffron: #FF8C42;
+  --saffron-dark: #E6793A;
   --destructive: #d4183d;
-  --warning: #F59E0B;
-  --error: #EF4444;
   --destructive-foreground: #ffffff;
-  --border: rgba(242, 153, 74, 0.2);
+  --border: rgba(0, 0, 0, 0.1);
   --input: transparent;
-  --input-background: #FFFFFF;
-  --switch-background: #F0E6D2;
+  --input-background: #f3f3f5;
+  --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #F2994A;
-  --success: #27AE60;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --chart-1: #F2994A;
-  --chart-2: #F2C94C;
-  --chart-3: #E67E22;
-  --chart-4: #F39C12;
-  --chart-5: #D68910;
-  --radius: 0.875rem;
-  --sidebar: #FFFBF5;
-  --sidebar-foreground: #2D1810;
-  --sidebar-primary: #F2994A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #FFF7E6;
-  --sidebar-accent-foreground: #2D1810;
-  --sidebar-border: rgba(242, 153, 74, 0.2);
-  --sidebar-ring: #F2994A;
-}
-
-/* Calm Blue Theme */
-[data-theme="calm"] {
-  --background: #F2F8FF;
-  --foreground: #1D1D1F;
-  --card: #FFFFFF;
-  --card-foreground: #1D1D1F;
-  --popover: #FFFFFF;
-  --popover-foreground: #1D1D1F;
-  --primary: #007AFF;
-  --primary-foreground: #FFFFFF;
-  --secondary: #5AC8FA;
-  --secondary-foreground: #1D1D1F;
-  --muted: #E6F3FF;
-  --muted-foreground: #6B7280;
-  --accent: #DBEAFE;
-  --accent-foreground: #1D1D1F;
-  --border: rgba(0, 122, 255, 0.2);
-  --ring: #007AFF;
-  --success: #34C759;
-}
-
-/* Nature Green Theme */
-[data-theme="nature"] {
-  --background: #F0FFF0;
-  --foreground: #1D3A1D;
-  --card: #FFFFFF;
-  --card-foreground: #1D3A1D;
-  --popover: #FFFFFF;
-  --popover-foreground: #1D3A1D;
-  --primary: #34C759;
-  --primary-foreground: #FFFFFF;
-  --secondary: #8FDB8F;
-  --secondary-foreground: #1D3A1D;
-  --muted: #E8F5E8;
-  --muted-foreground: #6B8E6B;
-  --accent: #DCFCE7;
-  --accent-foreground: #1D3A1D;
-  --border: rgba(52, 199, 89, 0.2);
-  --ring: #34C759;
-  --success: #34C759;
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #030213;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 .dark {
-  --background: #1C1C1E;
-  --foreground: #F2F2F7;
-  --card: #2C2C2E;
-  --card-foreground: #F2F2F7;
-  --popover: #2C2C2E;
-  --popover-foreground: #F2F2F7;
-  --primary: #FF9F0A;
-  --primary-dark: #E08B06;
-  --primary-light: #3A3A3C;
-  --primary-foreground: #1C1C1E;
-  --secondary: #FFD60A;
-  --secondary-foreground: #1C1C1E;
-  --muted: #3A3A3C;
-  --muted-foreground: #8E8E93;
-  --text-secondary: #A1A1AA;
-  --text-muted: #71717A;
-  --accent: #48484A;
-  --accent-foreground: #F2F2F7;
-  --border: rgba(255, 159, 10, 0.3);
-  --ring: #FF9F0A;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
 }
 
 @theme inline {
@@ -132,10 +95,21 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-saffron: var(--saffron);
+  --color-saffron-dark: var(--saffron-dark);
+  
+  /* Theme Colors */
+  --golden-sunrise-base: #FDF6E3;
+  --golden-sunrise-accent: #D4AF37;
+  --golden-sunrise-light: #FAF0E6;
+  --cosmic-night-base: #1a1a2e;
+  --cosmic-night-accent: #16213e;
+  --cosmic-night-light: #0f3460;
+  --lotus-heart-base: #fdf2f8;
+  --lotus-heart-accent: #ec4899;
+  --lotus-heart-light: #fce7f3;
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-warning: var(--warning);
-  --color-error: var(--error);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-input-background: var(--input-background);
@@ -158,7 +132,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-success: var(--success);
 }
 
 @layer base {
@@ -168,7 +141,6 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, ui-sans-serif, system-ui, sans-serif;
   }
 }
 
@@ -230,56 +202,3 @@
 html {
   font-size: var(--font-size);
 }
-
-/* Utilities mapped from the redesign */
-.gradient-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-}
-.shadow-elevated {
-  box-shadow: var(--shadow);
-}
-.shadow-elevated-lg {
-  box-shadow: var(--shadow-lg);
-}
-
-/* Selection card baseline (used by Tile and future cards) */
-.selection-card {
-  background: var(--card);
-  border: 2px solid var(--border);
-  border-radius: 16px;
-  padding: 20px;
-  text-align: center;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-.selection-card:hover {
-  border-color: color-mix(in oklab, var(--primary) 35%, #ffffff 65%);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-.selection-card.selected {
-  border-color: var(--primary);
-  background: var(--primary-light);
-}
-
-/* Onboarding progress dots */
-.progress-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border);
-  transition: all 0.3s ease;
-}
-.progress-dot.active {
-  background: var(--primary);
-  transform: scale(1.2);
-}
-.progress-dot.completed {
-  background: var(--success);
-}
-
-/* Optional page transitions if needed alongside framer-motion */
-.page-enter { opacity: 0; transform: translateX(20px); }
-.page-enter-active { opacity: 1; transform: translateX(0); transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); }
-.page-exit { opacity: 1; transform: translateX(0); }
-.page-exit-active { opacity: 0; transform: translateX(-20px); transition: all 200ms cubic-bezier(0.4, 0, 1, 1); }

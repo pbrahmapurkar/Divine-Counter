@@ -1,1091 +1,980 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { 
-  Home, Settings as SettingsIcon, History as HistoryIcon, Library,
-  Minus, Play, Pause, Calendar, TrendingUp, Award,
-  Sun, Moon, PlusCircle, ChevronLeft
-} from 'lucide-react';
-import { CounterButton } from './components/counter-button';
-import { ProgressRing } from './components/progress-ring';
-import { StatsCard } from './components/stats-card';
-import { ThemeSelector } from './components/theme-selector';
-import { SettingsScreen as SettingsPanel } from './components/SettingsScreen';
-import { DivineLogo } from './components/divine-logo';
-import { Onboarding as OBNew } from './components/onboarding/Onboarding';
-import { CreateCounterDialog } from './components/create-counter-dialog';
-import { CreateCounterPage } from './components/create-counter-page';
-import { Button } from './components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Switch } from './components/ui/switch';
-import { Label } from './components/ui/label';
-import { Input } from './components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './components/ui/alert-dialog';
-import { toast, Toaster } from 'sonner';
-import { haptic } from './core/haptics';
-import { cn } from './components/ui/utils';
-// import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
-import { DiagnosticsPanel } from './components/diagnostics-panel';
-import BootScreen from './components/boot/BootScreen';
-import { preloadBootAssets } from './components/boot/boot-preload';
-import { eventBus, createEvent, EventTypes } from './services/EventBus';
-import CongratsOverlay from './components/overlays/CongratsOverlay';
-import { useVolumeButtons } from './hooks/useVolumeButtons';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
+import { LocalNotifications } from "@capacitor/local-notifications";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+import { HomeScreen } from "./components/HomeScreen";
+import { CountersScreen } from "./components/CountersScreen";
+import { PracticeJournalScreen } from "./components/PracticeJournalScreen";
+import { SettingsScreen } from "./components/SettingsScreen";
+import {
+  AboutPage,
+  PrivacyPolicyPage,
+  TermsOfServicePage
+} from "./components/info";
+import { BottomNavigation } from "./components/BottomNavigation";
+import { BootScreen } from "./components/BootScreen";
+import { WelcomingRitualStep1 } from "./components/WelcomingRitualStep1";
+import { WelcomingRitualStep2 } from "./components/WelcomingRitualStep2";
+import { WelcomingRitualStep3 } from "./components/WelcomingRitualStep3";
+import { AddCounterModal } from "./components/AddCounterModal";
+import { EditPracticeScreen } from "./components/EditPracticeScreen";
+import { AddPracticeScreen } from "./components/AddPracticeScreen";
+import { toast } from "sonner";
+import { REWARDS, STREAK_MILESTONES, getRewardsByStreak, Reward, StreakMilestone } from "./data/rewards";
+import { RewardUnlockModal } from "./components/RewardUnlockModal";
+import { calculateAndUpdateStreak } from "./utils/streaks";
 
-// Spec-local types (session-only, useState)
-type Screen = 'counter' | 'history' | 'counters' | 'settings' | 'addCounter';
-type DayKey = string; // YYYY-MM-DD
+// --- Helper Functions ---
+const MAX_HISTORY_ENTRIES = 365;
 
-interface User { id: string; name: string; createdAt: number; }
+const hydrateMilestones = (savedMilestones?: StreakMilestone[]): StreakMilestone[] => {
+  return STREAK_MILESTONES.map(base => {
+    const saved = savedMilestones?.find(m => m.days === base.days);
+    return {
+      ...base,
+      isAchieved: saved?.isAchieved ?? false,
+      achievedAt: saved?.achievedAt,
+    };
+  });
+};
+
+const parseReminderTime = (time: string): { hour: number; minute: number } | null => {
+  if (!time || typeof time !== "string") return null;
+  const [hourStr, minuteStr] = time.split(":");
+  if (hourStr === undefined || minuteStr === undefined) return null;
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return {
+    hour: Math.max(0, Math.min(23, hour)),
+    minute: Math.max(0, Math.min(59, minute)),
+  };
+};
+
+const computeNotificationId = (counterId: string): number => {
+  // Always use hash-based approach to ensure we stay within 32-bit integer limits
+  // This prevents issues with IDs that were created using Date.now()
+  let hash = 0;
+  for (let i = 0; i < counterId.length; i += 1) {
+    hash = (hash * 31 + counterId.charCodeAt(i)) % 2147483647;
+  }
+  // Ensure we return a positive integer between 1 and 2147483647 (max Java int)
+  return Math.abs(hash) || 1;
+};
+
+const generateUniqueIntId = (): number => {
+  const maxInt = 2147483647;
+  return Math.floor(Math.random() * maxInt);
+};
+
+const hydrateCounter = (raw: Partial<Counter> & { id: string | number }): Counter => {
+  const reminderEnabled = Boolean(raw.reminderEnabled);
+  const reminderTime = raw.reminderTime && /^\d{2}:\d{2}$/.test(raw.reminderTime)
+    ? raw.reminderTime
+    : "09:00";
+
+  return {
+    id: String(raw.id ?? generateUniqueIntId()),
+    name: raw.name || "Practice",
+    color: raw.color || "#D4AF37",
+    cycleCount: raw.cycleCount ?? 108,
+    dailyGoal: raw.dailyGoal ?? 3,
+    icon: raw.icon || "lotus",
+    reminderEnabled,
+    reminderTime,
+  };
+};
+
+// --- Interfaces ---
 interface Counter {
   id: string;
   name: string;
   color: string;
-  cycleSize: number;
-  target: number;
-  totalCount: number;
-  totalMaalas: number;
-  todayCount: number;
-  todayMaalas: number;
-  streak: number;
-  createdAt: number;
-  updatedAt: number;
-  archived?: boolean;
+  cycleCount: number;
+  dailyGoal: number;
+  icon?: string;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
-interface DayStats { rawCounts: number; manualMaalasDelta: number; }
-type StatsByDay = Record<DayKey, Record<string, DayStats>>;
-interface SessionStats { sessionCount: number; isActive: boolean; startTime: number | null; }
-type DarkModePref = 'auto' | 'light' | 'dark';
+interface CounterState {
+  [counterId: string]: {
+  currentCount: number;
+  todayProgress: number;
+  lastCountDate: string;
+  };
+}
+interface HistoryEntry {
+  date: string;
+  count: number;
+  goalAchieved: boolean;
+  practiceId: string;
+}
+interface JournalEntry {
+  date: string;
+  reflection: string;
+}
 interface Settings {
   hapticsEnabled: boolean;
-  theme: string; // accent/theme id
-  darkMode: DarkModePref;
-  defaultCounterId?: string;
-  customColor?: string;
-  volumeButtonsEnabled?: boolean;
+  volumeKeyControl: boolean;
 }
+type OnboardingStep = "greeting" | "practice" | "affirmation";
+type AppScreen =
+  | "home"
+  | "history"
+  | "counters"
+  | "settings"
+  | "edit-practice"
+  | "add-practice"
+  | "about"
+  | "privacy"
+  | "terms";
 
-// Helpers
-const dayKey = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0,10);
-const derivedMaalas = (raw: number, delta: number, cycle: number) => Math.max(0, Math.floor(raw / Math.max(1, cycle)) + delta);
-const isBoundaryCross = (prevRaw: number, nextRaw: number, cycle: number) => Math.floor(prevRaw / Math.max(1,cycle)) < Math.floor(nextRaw / Math.max(1,cycle));
-const crossedBelowBoundary = (prevRaw: number, nextRaw: number, cycle: number) => Math.floor(prevRaw / Math.max(1,cycle)) > Math.floor(nextRaw / Math.max(1,cycle));
-
+// --- Main App Component ---
 export default function App() {
-  const prefersReducedMotion = useReducedMotion();
-  const [hasBooted, setHasBooted] = useState(false);
-  // Global state (session only)
-  const [isFirstRun, setIsFirstRun] = useState(true);
-  const [user, setUser] = useState<User|null>(null);
-  const [counters, setCounters] = useState<Counter[]>([]);
-  const [activeCounterId, setActiveCounterId] = useState<string|undefined>(undefined);
-  const [statsByDay, setStatsByDay] = useState<StatsByDay>({});
-  const [session, setSession] = useState<SessionStats>({ sessionCount: 0, isActive: false, startTime: null });
-  const [settings, setSettings] = useState<Settings>({
-    hapticsEnabled: false,
-    theme: 'nature',
-    darkMode: 'light',
-    volumeButtonsEnabled: false,
-  });
-  const [currentScreen, setCurrentScreen] = useState<Screen>('counter');
-  const [showCounterDialog, setShowCounterDialog] = useState(false);
-  const [editingCounter, setEditingCounter] = useState<Counter | null>(null);
+  const [isBooting, setIsBooting] = useState(true);
+  const [isOnboarding, setIsOnboarding] = useState(true);
+  const [onboardingStep, setOnboardingStep] = useState("greeting" as OnboardingStep);
+  const [currentScreen, setCurrentScreen] = useState("home" as AppScreen);
+  const [isNotificationPending, setIsNotificationPending] = useState(false);
+  const [counters, setCounters] = useState([] as Counter[]);
+  const [activeCounterId, setActiveCounterId] = useState("");
+  const [counterStates, setCounterStates] = useState({} as CounterState);
+  const [history, setHistory] = useState([] as HistoryEntry[]);
+  const [journalEntries, setJournalEntries] = useState([] as JournalEntry[]);
+  const [streak, setStreak] = useState(0);
+  const [settings, setSettings] = useState({
+    hapticsEnabled: true,
+    volumeKeyControl: true
+  } as Settings);
+  const [isAddCounterModalOpen, setIsAddCounterModalOpen] = useState(false);
+  const [editingCounterId, setEditingCounterId] = useState("");
+  const [onboardingData, setOnboardingData] = useState({ userName: "" } as { userName: string; practiceData?: any; });
+  const [userName, setUserName] = useState("");
+  
+  // Reward System State
+  const [rewards, setRewards] = useState(REWARDS.map(reward => ({ ...reward, isUnlocked: false })) as Reward[]);
+  const [milestones, setMilestones] = useState(() => hydrateMilestones());
+  const [unlockedRewards, setUnlockedRewards] = useState([] as string[]);
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [newRewards, setNewRewards] = useState([] as Reward[]);
+  const [newReward, setNewReward] = useState(null as Reward | null);
+  const [pendingRewards, setPendingRewards] = useState([] as Reward[]);
+  const [longestStreak, setLongestStreak] = useState(0);
+  const notificationPermissionRequestedRef = useRef(false);
+  const hasSyncedRemindersRef = useRef(false);
 
-  const activeCounter = useMemo(() => counters.find(c => c.id === activeCounterId) ?? counters[0], [counters, activeCounterId]);
+  const ensureNotificationPermissions = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) {
+      return true;
+    }
 
-  // Theme application
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = settings.theme;
-    const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const isDark = settings.darkMode === 'dark' || (settings.darkMode === 'auto' && prefersDark);
-    root.classList.toggle('dark', isDark);
-  }, [settings.theme, settings.darkMode]);
-
-  useEffect(() => {
-    if (hasBooted) return;
-    document.documentElement.classList.add('boot-lock');
-    preloadBootAssets();
-    const minHold = 1200; const maxHold = 2000;
-    let released = false;
-    const release = () => {
-      if (released) return; released = true;
-      document.documentElement.classList.remove('boot-lock');
-      setHasBooted(true);
-    };
-    const minTimer = window.setTimeout(release, minHold);
-    const maxTimer = window.setTimeout(release, maxHold);
-    return () => { clearTimeout(minTimer); clearTimeout(maxTimer); };
-  }, [hasBooted]);
-
-  // Settings persistence (load on init, save on changes)
-  const SETTINGS_KEY = 'divine-counter-settings-v1';
-  useEffect(() => {
     try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Merge with defaults to handle migrations
-        setSettings((prev) => ({ ...prev, ...parsed }));
+      const permissionStatus = await LocalNotifications.checkPermissions();
+      if (permissionStatus.display === 'granted') {
+        return true;
       }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+      if (!notificationPermissionRequestedRef.current) {
+        notificationPermissionRequestedRef.current = true;
+        const requestStatus = await LocalNotifications.requestPermissions();
+        if (requestStatus.display === 'granted') {
+          return true;
+        }
+      }
+
+      toast.error("Notifications are disabled. Enable them in settings to receive reminders.");
+    } catch (error) {
+      console.error("Failed to request notification permissions", error);
+    }
+
+    return false;
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {}
-  }, [settings]);
-
-  // Notifications/reminders removed
-
-  // UI utilities
-  // Haptics handled via core/haptics; call only on boundary
-
-  // APIs from spec
-  function createCounter(input: {name:string;color:string;cycleSize:number;target:number}) {
-    const now = Date.now();
-    const counter: Counter = {
-      id: String(now),
-      name: input.name.trim() || 'My Practice',
-      color: input.color,
-      cycleSize: Math.max(1, Math.floor(input.cycleSize)),
-      target: Math.max(0, Math.floor(input.target)),
-      totalCount: 0,
-      totalMaalas: 0,
-      todayCount: 0,
-      todayMaalas: 0,
-      streak: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setCounters(cs => [counter, ...cs]);
-    setActiveCounterId(counter.id);
-    const k = dayKey();
-    setStatsByDay(prev => ({ ...prev, [k]: { ...(prev[k]||{}), [counter.id]: { rawCounts: 0, manualMaalasDelta: 0 } } }));
-  }
-
-  // function updateCounter(id: string, patch: Partial<Counter>) {
-  //   setCounters(cs => cs.map(c => c.id !== id ? c : ({ ...c, ...patch, updatedAt: Date.now() })));
-  // }
-
-  function archiveCounter(id: string) {
-    setCounters(cs => cs.map(c => c.id !== id ? c : ({ ...c, archived: true, updatedAt: Date.now() })));
-    if (activeCounterId === id) {
-      const next = counters.find(c => c.id !== id && !c.archived);
-      setActiveCounterId(next?.id);
+  const cancelReminderForCounter = useCallback(async (counterId: string) => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
     }
-  }
 
-  function increment() {
-    if (!activeCounter) return;
-    const id = activeCounter.id; const cycle = activeCounter.cycleSize; const k = dayKey();
-    setStatsByDay(prev => {
-      const day = prev[k]?.[id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-      const prevRaw = day.rawCounts; const nextRaw = prevRaw + 1;
-      const nextDay: DayStats = { ...day, rawCounts: nextRaw };
-      const nextStats = { ...prev, [k]: { ...(prev[k]||{}), [id]: nextDay } };
+    try {
+      const id = computeNotificationId(counterId);
+    await LocalNotifications.cancel({ notifications: [{ id }] });
+    } catch (error) {
+      console.error("Failed to cancel reminder", error);
+    }
+  }, []);
 
-      setCounters(cs => cs.map(c => {
-        if (c.id !== id) return c;
-        const todayMaalas = derivedMaalas(nextRaw, nextDay.manualMaalasDelta, cycle);
-        const bumpedMaalas = isBoundaryCross(prevRaw,nextRaw,cycle) ? 1 : 0;
-        return {
-          ...c,
-          totalCount: c.totalCount + 1,
-          todayCount: nextRaw,
-          todayMaalas,
-          totalMaalas: c.totalMaalas + bumpedMaalas,
-          updatedAt: Date.now()
-        };
-      }));
+  const scheduleReminderForCounter = useCallback(async (counter: Counter) => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
 
-      if (isBoundaryCross(prevRaw,nextRaw,cycle)) {
-        if (settings.hapticsEnabled) haptic('success');
-        toast.success('🪷 Maala complete');
-        const sessionId = String(session.startTime || Date.now());
-        const completedCount = Math.floor(nextRaw / Math.max(1, cycle));
-        // Emit event unconditionally so UI can show congrats overlay
-        eventBus.emit(createEvent.maalaCompleted(id, sessionId, completedCount));
+    const notificationId = computeNotificationId(counter.id);
+
+    try {
+      await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+    } catch (error) {
+      console.error("Failed to cancel existing reminder", error);
+    }
+
+    if (!counter.reminderEnabled) {
+      return;
+    }
+
+    const permissionGranted = await ensureNotificationPermissions();
+    if (!permissionGranted) {
+      return;
+    }
+
+    const time = parseReminderTime(counter.reminderTime);
+    if (!time) {
+      console.warn("Invalid reminder time, skipping schedule", counter.reminderTime);
+      return;
+    }
+
+    try {
+      const notificationId = computeNotificationId(counter.id);
+      console.log('--- DEBUGGING NOTIFICATION ---');
+      console.log('Scheduling for practice:', counter.name);
+      console.log('Original Practice ID from state:', counter.id, '(type: ' + typeof counter.id + ')');
+      console.log('Safe notification ID generated:', notificationId, '(type: ' + typeof notificationId + ')');
+      console.log('------------------------------');
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: notificationId,
+            title: `Time for your ${counter.name} practice`,
+            body: "A moment for your daily ritual. Let's begin. 🙏",
+            schedule: {
+              repeats: true,
+              every: 'day',
+              on: { hour: time.hour, minute: time.minute },
+              allowWhileIdle: true,
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("Failed to schedule reminder", error);
+    }
+  }, [ensureNotificationPermissions]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+    if (isBooting || isOnboarding) {
+      return;
+    }
+    if (hasSyncedRemindersRef.current) {
+      return;
+    }
+
+    hasSyncedRemindersRef.current = true;
+
+    counters.forEach(counter => {
+      if (counter.reminderEnabled) {
+        scheduleReminderForCounter(counter);
+      } else {
+        cancelReminderForCounter(counter.id);
+      }
+    });
+  }, [isBooting, isOnboarding, counters, scheduleReminderForCounter, cancelReminderForCounter]);
+
+  // Load data from localStorage on initial load
+  useEffect(() => {
+    if (!isBooting) {
+      const savedOnboarding = localStorage.getItem("divine-counter-onboarded");
+      if (savedOnboarding) {
+        setIsOnboarding(false);
+        const savedActiveCounterId = localStorage.getItem("divine-counter-active") || "";
+        const storedCounters = JSON.parse(localStorage.getItem("divine-counter-counters") || '[]');
+        const hydratedCounters = storedCounters.map((counter: Counter) => hydrateCounter(counter));
+        setCounters(hydratedCounters);
+        setCounterStates(JSON.parse(localStorage.getItem("divine-counter-states") || '{}'));
+        const rawHistory = JSON.parse(localStorage.getItem("divine-counter-history") || '[]');
+        const legacyFallbackId =
+          hydratedCounters.length === 1
+            ? hydratedCounters[0].id
+            : savedActiveCounterId || 'legacy';
+        const normalizedHistory = Array.isArray(rawHistory)
+          ? rawHistory.map((entry: any) => ({
+              ...entry,
+              practiceId: typeof entry.practiceId === 'string' && entry.practiceId.length > 0
+                ? entry.practiceId
+                : legacyFallbackId,
+            }))
+          : [];
+        setHistory(normalizedHistory);
+        setJournalEntries(JSON.parse(localStorage.getItem("divine-counter-journal") || '[]'));
+        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true,"volumeKeyControl":true}'));
+        setActiveCounterId(savedActiveCounterId);
+        setUserName(localStorage.getItem("divine-counter-username") || "");
+        setUnlockedRewards(JSON.parse(localStorage.getItem("divine-counter-unlocked-rewards") || '[]'));
+        setLongestStreak(parseInt(localStorage.getItem("divine-counter-longest-streak") || '0'));
+        const savedMilestones = localStorage.getItem("divine-counter-milestones");
+        setMilestones(hydrateMilestones(savedMilestones ? JSON.parse(savedMilestones) : undefined));
+        setRewards(JSON.parse(localStorage.getItem("divine-counter-rewards") || JSON.stringify(REWARDS.map(reward => ({ ...reward, isUnlocked: false })))));
+      }
+    }
+  }, [isBooting]);
+
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    if (!isOnboarding && !isBooting) {
+    localStorage.setItem("divine-counter-onboarded", "true");
+    localStorage.setItem("divine-counter-counters", JSON.stringify(counters));
+    localStorage.setItem("divine-counter-states", JSON.stringify(counterStates));
+    localStorage.setItem("divine-counter-history", JSON.stringify(history));
+    localStorage.setItem("divine-counter-journal", JSON.stringify(journalEntries));
+    localStorage.setItem("divine-counter-settings", JSON.stringify(settings));
+    localStorage.setItem("divine-counter-active", activeCounterId);
+    localStorage.setItem("divine-counter-username", userName);
+    localStorage.setItem("divine-counter-unlocked-rewards", JSON.stringify(unlockedRewards));
+    localStorage.setItem("divine-counter-longest-streak", longestStreak.toString());
+    localStorage.setItem("divine-counter-milestones", JSON.stringify(milestones));
+    localStorage.setItem("divine-counter-rewards", JSON.stringify(rewards));
+    }
+  }, [counters, counterStates, history, journalEntries, settings, activeCounterId, userName, isOnboarding, isBooting, milestones, rewards, unlockedRewards, longestStreak]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    const mainScreens: AppScreen[] = ["home", "history", "counters", "settings"];
+
+    const backHandler = CapacitorApp.addListener("backButton", () => {
+      if (isOnboarding) {
+        if (onboardingStep === "affirmation") {
+          setOnboardingStep("practice");
+          return;
+        }
+
+        if (onboardingStep === "practice") {
+          setOnboardingStep("greeting");
+          return;
+        }
+
+        CapacitorApp.exitApp();
+        return;
       }
 
-      return nextStats;
+      if (showRewardModal) {
+        setShowRewardModal(false);
+        return;
+      }
+
+      if (isAddCounterModalOpen) {
+        setIsAddCounterModalOpen(false);
+        return;
+      }
+
+      if (currentScreen === "add-practice" || currentScreen === "edit-practice") {
+        setCurrentScreen("counters");
+        return;
+      }
+
+      if (mainScreens.includes(currentScreen)) {
+        CapacitorApp.exitApp();
+        return;
+      }
     });
-    if (session.isActive) setSession(s => ({ ...s, sessionCount: s.sessionCount + 1 }));
-  }
 
-  function decrement() {
-    if (!activeCounter) return;
-    const id = activeCounter.id; const cycle = activeCounter.cycleSize; const k = dayKey();
-    setStatsByDay(prev => {
-      const day = prev[k]?.[id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-      const prevRaw = day.rawCounts; const nextRaw = Math.max(0, prevRaw - 1);
-      const nextDay: DayStats = { ...day, rawCounts: nextRaw };
-      const nextStats = { ...prev, [k]: { ...(prev[k]||{}), [id]: nextDay } };
-
-      setCounters(cs => cs.map(c => {
-        if (c.id !== id) return c;
-        const todayMaalasPrev = derivedMaalas(prevRaw, day.manualMaalasDelta, cycle);
-        const todayMaalasNext = derivedMaalas(nextRaw, nextDay.manualMaalasDelta, cycle);
-        const crossed = crossedBelowBoundary(prevRaw,nextRaw,cycle);
-        if (crossed && todayMaalasPrev > 0) toast('Adjusted: below maala boundary');
-        return {
-          ...c,
-          totalCount: Math.max(0, c.totalCount - (prevRaw>nextRaw?1:0)),
-          todayCount: nextRaw,
-          todayMaalas: todayMaalasNext,
-          totalMaalas: Math.max(0, c.totalMaalas - (crossed ? 1 : 0)),
-          updatedAt: Date.now()
-        };
-      }));
-
-      return nextStats;
-    });
-    if (session.isActive) setSession(s => ({ ...s, sessionCount: Math.max(0, s.sessionCount - 1) }));
-  }
-
-  function manualAddMaala() {
-    if (!activeCounter) return; const id = activeCounter.id; const k = dayKey(); const cycle = activeCounter.cycleSize;
-    setStatsByDay(prev => {
-      const day = prev[k]?.[id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-      const nextDay: DayStats = { ...day, manualMaalasDelta: day.manualMaalasDelta + 1 };
-      const nextStats = { ...prev, [k]: { ...(prev[k]||{}), [id]: nextDay } };
-      setCounters(cs => cs.map(c => c.id !== id ? c : ({
-        ...c,
-        todayMaalas: derivedMaalas(nextDay.rawCounts, nextDay.manualMaalasDelta, cycle),
-        totalMaalas: c.totalMaalas + 1,
-        updatedAt: Date.now()
-      })));
-      return nextStats;
-    });
-  }
-
-  function manualRemoveMaala() {
-    if (!activeCounter) return; const id = activeCounter.id; const k = dayKey(); const cycle = activeCounter.cycleSize;
-    setStatsByDay(prev => {
-      const day = prev[k]?.[id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-      const proposed = day.manualMaalasDelta - 1;
-      const wouldBe = derivedMaalas(day.rawCounts, proposed, cycle);
-      if (wouldBe < 0) { toast.error('Cannot go below 0 maalas'); return prev; }
-      const nextDay: DayStats = { ...day, manualMaalasDelta: proposed };
-      const nextStats = { ...prev, [k]: { ...(prev[k]||{}), [id]: nextDay } };
-      setCounters(cs => cs.map(c => c.id !== id ? c : ({
-        ...c,
-        todayMaalas: derivedMaalas(nextDay.rawCounts, nextDay.manualMaalasDelta, cycle),
-        totalMaalas: Math.max(0, c.totalMaalas - 1),
-        updatedAt: Date.now()
-      })));
-      return nextStats;
-    });
-  }
-
-  function startSession() { setSession(s => ({ ...s, isActive: true, startTime: Date.now() })); }
-  function pauseSession() { setSession(s => ({ ...s, isActive: false })); }
-  function resetToday() {
-    // Strict RESET Today: session.sessionCount → no change
-    if (!activeCounter) return;
-    const id = activeCounter.id; const k = dayKey(); const cycle = activeCounter.cycleSize;
-    setStatsByDay(prev => {
-      const day = prev[k]?.[id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-      const prevRaw = day.rawCounts;
-      const prevDerived = derivedMaalas(day.rawCounts, day.manualMaalasDelta, cycle);
-      const nextDay: DayStats = { ...day, rawCounts: 0 }; // manualMaalasDelta unchanged
-      const nextStats = { ...prev, [k]: { ...(prev[k]||{}), [id]: nextDay } };
-      setCounters(cs => cs.map(c => c.id !== id ? c : ({
-        ...c,
-        // todayCount/todayMaalas unchanged by spec
-        totalCount: Math.max(0, c.totalCount - prevRaw),
-        totalMaalas: Math.max(0, c.totalMaalas - prevDerived),
-        updatedAt: Date.now(),
-      })));
-      return nextStats;
-    });
-    try { toast.success('Today reset'); } catch {}
-  }
-  function setHaptics(on:boolean) { setSettings(s => ({ ...s, hapticsEnabled: on })); }
-  function setTheme(t: Settings['theme']) { setSettings(s => ({ ...s, theme: t })); }
-  // Dark mode is controlled via settings.darkMode ('auto' | 'light' | 'dark')
-
-  // Onboarding integration
-  const handleOnboardingComplete = (data: { userName: string; counter: { id:string; name:string; color:string; cycleSize:number; target:number }; settings: { theme: string } }) => {
-    const now = Date.now();
-    setUser({ id: String(now), name: data.userName.trim().slice(0,40) || 'Friend', createdAt: now });
-    createCounter({ name: data.counter.name, color: data.counter.color, cycleSize: data.counter.cycleSize, target: data.counter.target });
-    setIsFirstRun(false);
-    setCurrentScreen('counter');
-  };
-
-  // Render pieces
-  const MobileContainer = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen max-w-md mx-auto bg-background border-x border-border relative overflow-hidden">
-      {children}
-      <Toaster richColors />
-    </div>
-  );
-
-  const Navigation = () => (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md h-[var(--dc-bottom-nav-h)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border z-50">
-      <div className="grid grid-cols-4 gap-2 px-4 py-3">
-        {[
-          { id: 'counter', icon: Home, label: 'Home' },
-          { id: 'history', icon: HistoryIcon, label: 'History' },
-          { id: 'counters', icon: Library, label: 'Counters' },
-          { id: 'settings', icon: SettingsIcon, label: 'Settings' }
-        ].map(({ id, icon: Icon, label }) => (
-          <Button
-            key={id}
-            variant={currentScreen === id ? 'outline' : 'ghost'}
-            size="sm"
-            onClick={() => setCurrentScreen(id as Screen)}
-            className={cn(
-              "flex flex-col items-center gap-1 h-auto py-2 px-3 rounded-xl",
-              currentScreen === id ? "text-primary border-primary/30 bg-primary/5" : "text-muted-foreground"
-            )}
-          >
-            <Icon size={20} />
-            <span className="text-xs">{label}</span>
-          </Button>
-        ))}
-      </div>
-    </nav>
-  );
-
-  const CounterScreen = () => {
-    const k = dayKey();
-    const today = activeCounter ? (statsByDay[k]?.[activeCounter.id]?.rawCounts ?? 0) : 0;
-    const cycle = activeCounter?.cycleSize ?? 108;
-    const greet = () => {
-      const hr = new Date().getHours();
-      if (hr < 12) return 'Good morning';
-      if (hr < 18) return 'Good afternoon';
-      return 'Good evening';
+    return () => {
+      backHandler.remove();
     };
-    const tapsToNext = ((cycle - (today % cycle)) % cycle) || cycle;
-    const pct = Math.round(((today % cycle) / cycle) * 100);
-    const [showCongrats, setShowCongrats] = useState(false);
-    useVolumeButtons(!!settings.volumeButtonsEnabled, { onUp: increment, onDown: decrement });
-    useEffect(() => {
-      const unsub = eventBus.subscribe(EventTypes.MAALA_COMPLETED, (e:any) => {
-        // Only show for current active counter
-        if (!activeCounter) return;
-        if (e?.payload?.counterId === activeCounter.id) setShowCongrats(true);
+  }, [currentScreen, isAddCounterModalOpen, isOnboarding, onboardingStep, showRewardModal]);
+
+  // Detect day change based on local time and roll over progress/history
+  useEffect(() => {
+    if (isBooting || isOnboarding || !activeCounterId) {
+      return;
+    }
+
+    const currentState = counterStates[activeCounterId];
+    if (!currentState) {
+      return;
+    }
+
+    const todayString = new Date().toDateString();
+    if (currentState.lastCountDate === todayString) {
+      return;
+    }
+
+    const counter = counters.find(c => c.id === activeCounterId);
+    if (!counter) {
+      return;
+    }
+
+    if (currentState.todayProgress > 0) {
+      const newEntry: HistoryEntry = {
+        date: currentState.lastCountDate,
+        count: currentState.todayProgress,
+        goalAchieved: currentState.todayProgress >= counter.dailyGoal,
+        practiceId: counter.id,
+      };
+
+      setHistory(prev => {
+        const deduped = prev.filter(
+          entry => !(entry.date === newEntry.date && entry.practiceId === newEntry.practiceId)
+        );
+        const updated = [newEntry, ...deduped];
+        return updated.slice(0, MAX_HISTORY_ENTRIES);
       });
-      return () => { unsub && unsub(); };
-    }, [activeCounter?.id]);
-    return (
-      <div className="px-6 space-y-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 96px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 128px)' }}>
-        {/* Header (fixed, solid background) */}
-        <div
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-6 pb-4 bg-background border-b border-border shadow"
-          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', minHeight: '96px' }}
-        >
-          <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <DivineLogo size={40} className="text-primary" />
-            <div>
-              <div className="text-sm text-muted-foreground">{greet()}{user?.name ? `, ${user.name}` : ''}</div>
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">Divine Counter</h1>
-            </div>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentScreen('counters')} className="text-muted-foreground">⋯</Button>
-          </div>
-        </div>
+    }
 
-        {/* Active practice card */}
-        <Card className="shadow-elevated mt-2">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold text-foreground flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: activeCounter?.color || 'var(--primary)' }} />
-                {activeCounter?.name || 'Practice'}
-              </div>
-              <div className="text-xs text-muted-foreground">{today % cycle} / {cycle}</div>
-            </div>
-            <div className="flex gap-1 items-center overflow-hidden">
-              {Array.from({ length: 30 }).map((_, i) => {
-                const threshold = Math.round((i + 1) / 30 * cycle);
-                const filled = (today % cycle) >= threshold;
-                return <div key={i} className={cn("h-1.5 flex-1 rounded-full", filled ? "bg-primary" : "bg-muted")}></div>;
-              })}
-            </div>
-            <div className="text-xs text-muted-foreground mt-2">{today % cycle} of {cycle} beads • {pct}% complete</div>
-          </CardContent>
-        </Card>
+    setCounterStates(prev => {
+      const existing = prev[activeCounterId];
+      if (!existing) {
+        return prev;
+      }
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <StatsCard title="STREAK" value={activeCounter?.streak ?? 0} variant="streak" icon={<Award size={16} />} />
-          <StatsCard title="PROGRESS" value={`${activeCounter?.todayMaalas ?? 0}/${activeCounter?.target ?? 1}`} variant="today" icon={<Calendar size={16} />} />
-          <StatsCard title="TOTAL" value={activeCounter?.totalCount ?? 0} variant="total" icon={<TrendingUp size={16} />} />
-        </div>
+      return {
+        ...prev,
+        [activeCounterId]: {
+          ...existing,
+          todayProgress: 0,
+          lastCountDate: todayString,
+        },
+      };
+    });
+  }, [isBooting, isOnboarding, activeCounterId, counterStates, counters]);
 
-        {/* Taps to next pill */}
-        <div className="flex justify-center">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border bg-muted/60 text-xs text-foreground">
-            {tapsToNext} more taps to complete your mala
-          </span>
-        </div>
+  // Reward system - queue new rewards when streak reaches unlock thresholds
+  useEffect(() => {
+    if (streak <= 0 || pendingRewards.length > 0) {
+      return;
+    }
 
-        {/* Ring + Button */}
-        <div className="flex justify-center">
-          <ProgressRing current={today % cycle} total={cycle} size={280} strokeWidth={12} color={activeCounter?.color} />
-        </div>
-        <div className="relative flex justify-center mb-10">
-          <CounterButton count={today} onIncrement={increment} onDecrement={decrement} disabled={!activeCounter} />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={decrement}
-            disabled={!activeCounter || today === 0}
-            className="absolute bottom-4 right-8 w-10 h-10 rounded-full p-0"
-            aria-label="Decrement"
-            title="-1"
-          >
-            -1
-          </Button>
-          <CongratsOverlay open={showCongrats} onClose={() => setShowCongrats(false)} cycleSize={cycle} />
-        </div>
-        {/* Quick actions removed per request */}
+    const rewardsForStreak = getRewardsByStreak(streak, rewards);
+    const lockedRewards = rewardsForStreak.filter(reward => !reward.isUnlocked);
 
-        {/* Session controls */}
-        <div className="flex justify-center gap-4 mb-24">
-          <Button variant="outline" size="lg" onClick={decrement} disabled={today===0} className="w-12 h-12 rounded-full p-0"><Minus size={20} /></Button>
-          <Button variant="outline" size="lg" onClick={() => session.isActive ? pauseSession() : startSession()} className="w-12 h-12 rounded-full p-0">{session.isActive ? <Pause size={20} /> : <Play size={20} />}</Button>
-        </div>
-      </div>
-    );
+    if (lockedRewards.length === 0) {
+      return;
+    }
+
+    setPendingRewards(lockedRewards);
+    setNewReward(lockedRewards[0]);
+  }, [streak, rewards, pendingRewards]);
+
+  // Reward system - unlock queued rewards and trigger celebration UI
+  useEffect(() => {
+    if (!pendingRewards.length || !newReward) {
+      return;
+    }
+
+    const unlockTimestamp = new Date().toISOString();
+
+    setRewards(prev => prev.map(reward =>
+      pendingRewards.some(pending => pending.id === reward.id)
+        ? { ...reward, isUnlocked: true, unlockedAt: unlockTimestamp }
+        : reward
+    ));
+
+    setUnlockedRewards(prev => {
+      const idsToAdd = pendingRewards.map(reward => reward.id);
+      const merged = new Set([...prev, ...idsToAdd]);
+      return Array.from(merged);
+    });
+
+    setNewRewards(pendingRewards.map(reward => ({
+      ...reward,
+      isUnlocked: true,
+      unlockedAt: unlockTimestamp
+    })));
+
+    setShowRewardModal(true);
+
+    toast.success(`🎉 New Reward Unlocked: ${newReward.name}!`, {
+      duration: 4000,
+    });
+
+    setPendingRewards([]);
+  }, [pendingRewards, newReward]);
+
+  // Streak calculation & milestone persistence
+  useEffect(() => {
+    if (isOnboarding) {
+      return;
+    }
+
+    setMilestones((previousMilestones) => {
+      const { currentStreak: calculatedStreak, milestones: updatedMilestones } = calculateAndUpdateStreak(
+        history,
+        previousMilestones
+      );
+
+      setStreak(calculatedStreak);
+      setLongestStreak((prev) => Math.max(prev, calculatedStreak));
+
+      updatedMilestones.forEach((milestone, index) => {
+        const wasAchieved = previousMilestones[index]?.isAchieved;
+        if (!wasAchieved && milestone.isAchieved) {
+          toast.success(`🎉 Milestone Achieved! ${milestone.days}-day streak unlocked.`);
+        }
+      });
+
+      if (updatedMilestones === previousMilestones) {
+        return previousMilestones;
+      }
+
+      return updatedMilestones;
+    });
+  }, [history, isOnboarding]);
+
+  // Onboarding handlers (No Changes)
+  const handleGreetingNext = (name: string) => {
+    setOnboardingData({ userName: name });
+    setOnboardingStep("practice");
+  };
+  const handlePracticeNext = (data: any) => {
+    setOnboardingData(prev => ({ ...prev, practiceData: data }));
+    setOnboardingStep("affirmation");
+  };
+  const handleOnboardingComplete = async () => {
+    if (!onboardingData.practiceData) return;
+    setUserName(onboardingData.userName);
+    const counterId = generateUniqueIntId();
+    const counter: Counter = {
+      id: String(counterId),
+      name: onboardingData.practiceData.name,
+      color: onboardingData.practiceData.theme.accentColor,
+      cycleCount: onboardingData.practiceData.cycleCount,
+      dailyGoal: onboardingData.practiceData.dailyGoal,
+      icon: 'lotus',
+      reminderEnabled: onboardingData.practiceData.reminderEnabled ?? false,
+      reminderTime: onboardingData.practiceData.reminderTime || "09:00",
+    };
+    setCounters([counter]);
+    setActiveCounterId(counter.id);
+    setCounterStates({ [counter.id]: { currentCount: 0, todayProgress: 0, lastCountDate: new Date().toDateString() } });
+    setCurrentScreen("home");
+    setOnboardingStep("greeting");
+    setIsOnboarding(false);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+    toast.success(`Welcome, ${onboardingData.userName}! 🙏`);
+
+    if (counter.reminderEnabled) {
+      await scheduleReminderForCounter(counter);
+    }
   };
 
-  const HistoryScreen = () => {
-    const k = dayKey();
-    const day = activeCounter ? (statsByDay[k]?.[activeCounter.id] ?? { rawCounts: 0, manualMaalasDelta: 0 }) : { rawCounts: 0, manualMaalasDelta: 0 };
-    const cycle = activeCounter?.cycleSize ?? 108;
-    const todayMaalas = activeCounter ? derivedMaalas(day.rawCounts, day.manualMaalasDelta, cycle) : 0;
-    const tapsToNext = activeCounter ? ((cycle - (day.rawCounts % cycle)) % cycle || cycle) : 0;
+  // Counter Actions - CORRECTED HAPTIC LOGIC
+  const handleIncrement = useCallback(() => {
+    if (!activeCounterId) return;
+    const counter = counters.find(c => c.id === activeCounterId);
+    if (!counter) return;
 
-    const fmtDay = (dk: string) => {
-      const d = new Date(dk);
-      const today = new Date(dayKey());
-      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-      if (dk === dayKey()) return 'Today';
-      if (dk === yesterday.toISOString().slice(0,10)) return 'Yesterday';
-      return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    if (settings.hapticsEnabled && Capacitor.isNativePlatform()) {
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+    }
+
+    const today = new Date().toDateString();
+    const currentState = counterStates[activeCounterId] || { currentCount: 0, todayProgress: 0, lastCountDate: today };
+    let newCount = currentState.currentCount + 1;
+    let newTodayProgress = currentState.todayProgress;
+
+    // Check if cycle is completed
+    if (newCount >= counter.cycleCount && !isNotificationPending) {
+      // Cycle completed - reset count and increment today's progress
+      newCount = 0;
+      newTodayProgress++;
+      setIsNotificationPending(true);
+      
+      // Haptic feedback for cycle completion
+      if (settings.hapticsEnabled && Capacitor.isNativePlatform()) {
+        Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+        Haptics.notification({ type: NotificationType.Success }).catch(() => {});
+      }
+      
+      toast.success("Cycle complete! 🎉");
+      setTimeout(() => setIsNotificationPending(false), 1000);
+    }
+
+    // Handle day change
+    if (currentState.lastCountDate !== today) {
+      // Save previous day's progress to history
+      if (currentState.todayProgress > 0) {
+        const newEntry: HistoryEntry = {
+          date: currentState.lastCountDate,
+          count: currentState.todayProgress,
+          goalAchieved: currentState.todayProgress >= counter.dailyGoal,
+          practiceId: counter.id
+        };
+        setHistory(prev => {
+          const deduped = prev.filter(
+            entry => !(entry.date === newEntry.date && entry.practiceId === newEntry.practiceId)
+          );
+          const updated = [newEntry, ...deduped];
+          return updated.slice(0, MAX_HISTORY_ENTRIES);
+        });
+      }
+    }
+
+    setCounterStates(prev => ({ ...prev, [activeCounterId]: { currentCount: newCount, todayProgress: newTodayProgress, lastCountDate: today } }));
+  }, [activeCounterId, counters, settings.hapticsEnabled, counterStates, isNotificationPending]);
+
+  const handleDecrement = useCallback(() => {
+    if (!activeCounterId) return;
+    const currentState = counterStates[activeCounterId];
+    if (!currentState || currentState.currentCount <= 0) return;
+
+    if (settings.hapticsEnabled && Capacitor.isNativePlatform()) {
+      Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
+    }
+
+    setCounterStates(prev => ({ ...prev, [activeCounterId]: { ...currentState, currentCount: currentState.currentCount - 1 } }));
+  }, [activeCounterId, counterStates, settings.hapticsEnabled]);
+
+  useEffect(() => {
+    if (!settings.volumeKeyControl) {
+      console.debug("Volume key control is disabled");
+      return;
+    }
+
+    if (!activeCounterId) {
+      console.debug("Volume key control requires an active counter");
+      return;
+    }
+
+    if (!Capacitor.isNativePlatform()) {
+      console.debug("Volume key control is only available on a native device");
+      return;
+    }
+
+    let isActive = true;
+    let volumeButtons: typeof import("@capacitor-community/volume-buttons")["VolumeButtons"] | null = null;
+    let modulePromise: Promise<typeof import("@capacitor-community/volume-buttons")> | null = null;
+
+    const setupVolumeControl = async () => {
+      try {
+        console.debug("Setting up volume key control...");
+        modulePromise = import("@capacitor-community/volume-buttons");
+        const module = await modulePromise;
+        volumeButtons = module.VolumeButtons;
+
+        if (!isActive) {
+          return;
+        }
+
+        try {
+          const status = await volumeButtons.isWatching();
+          if (status.value) {
+            await volumeButtons.clearWatch();
+            console.debug("Existing volume key control watcher cleared before re-initializing");
+          }
+        } catch (statusError) {
+          console.debug("Unable to verify existing volume key control watcher", statusError);
+        }
+
+        await volumeButtons.watchVolume({ suppressVolumeIndicator: true }, (event) => {
+          if (!isActive) {
+            return;
+          }
+
+          if (event.direction === "up") {
+            console.debug("Volume UP pressed - incrementing count");
+            handleIncrement();
+          } else if (event.direction === "down") {
+            console.debug("Volume DOWN pressed - decrementing count");
+            handleDecrement();
+          }
+        });
+
+        console.debug("Volume buttons watcher started successfully");
+      } catch (error) {
+        console.error("Failed to set up volume key control", error);
+      }
     };
 
-    const recentKeys = Object.keys(statsByDay)
-      .sort((a, b) => b.localeCompare(a))
-      .slice(0, 7);
+    setupVolumeControl();
 
-    const rows = activeCounter ? recentKeys
-      .filter(dk => !!statsByDay[dk]?.[activeCounter.id])
-      .map(dk => {
-        const st = statsByDay[dk][activeCounter.id];
-        const raw = st.rawCounts;
-        const mal = derivedMaalas(st.rawCounts, st.manualMaalasDelta, activeCounter.cycleSize);
-        const pct = Math.min(100, Math.round((raw % activeCounter.cycleSize) / activeCounter.cycleSize * 100));
-        const status: 'completed' | 'partial' | 'missed' = mal >= (activeCounter.target || 0)
-          ? (activeCounter.target ? 'completed' : 'partial')
-          : (mal === 0 ? 'missed' : 'partial');
-        return { dk, raw, mal, pct, status };
-      }) : [];
+    return () => {
+      isActive = false;
 
-    // Weekly progress (last 7 days)
-    const weekKeys = Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      return dayKey(d);
+      (async () => {
+        try {
+          const module = volumeButtons
+            ? { VolumeButtons: volumeButtons }
+            : modulePromise
+              ? await modulePromise
+              : null;
+          const buttons = module?.VolumeButtons;
+
+          if (!buttons) {
+            return;
+          }
+
+          try {
+            await buttons.clearWatch();
+            console.debug("Volume key control watcher cleared");
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("not been been watched")) {
+              console.debug("Volume key control watcher was already cleared");
+              return;
+            }
+            throw error;
+          }
+        } catch (error) {
+          console.error("Failed to clean up volume key control", error);
+        }
+      })();
+    };
+  }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
+
+  const resetCurrentCount = useCallback(() => {
+    if (!activeCounterId) return;
+    const currentState = counterStates[activeCounterId];
+    if (!currentState) return;
+
+    if (settings.hapticsEnabled) {
+      Haptics.selectionStart();
+    }
+
+    setCounterStates(prev => ({ ...prev, [activeCounterId]: { ...currentState, currentCount: 0 } }));
+  }, [activeCounterId, counterStates, settings.hapticsEnabled]);
+
+  // Other handlers (No Changes)
+  const handleCycleComplete = () => { /* Handled in increment */ };
+  const handleSelectCounter = (id: string) => { setActiveCounterId(id); setCurrentScreen("home"); };
+  const handleAddCounter = useCallback(async (data: Omit<Counter, "id">) => {
+    const id = generateUniqueIntId();
+    const newCounter = hydrateCounter({ ...data, id });
+
+    setCounters(prev => [...prev, newCounter]);
+    setCounterStates(prev => ({
+      ...prev,
+      [newCounter.id]: {
+        currentCount: 0,
+        todayProgress: 0,
+        lastCountDate: new Date().toDateString(),
+      },
+    }));
+    setActiveCounterId(newCounter.id);
+
+    if (newCounter.reminderEnabled) {
+      await scheduleReminderForCounter(newCounter);
+    } else {
+      await cancelReminderForCounter(newCounter.id);
+    }
+
+    toast.success("Practice added");
+  }, [scheduleReminderForCounter, cancelReminderForCounter]);
+
+  const handleEditCounter = useCallback((id: string) => {
+    setEditingCounterId(id);
+    setCurrentScreen("edit-practice");
+  }, []);
+
+  const handleUpdateCounter = useCallback(async (updated: Counter) => {
+    const hydrated = hydrateCounter(updated);
+
+    setCounters(prev => prev.map(counter => (counter.id === hydrated.id ? hydrated : counter)));
+
+    if (hydrated.reminderEnabled) {
+      await scheduleReminderForCounter(hydrated);
+    } else {
+      await cancelReminderForCounter(hydrated.id);
+    }
+
+    toast.success("Practice updated");
+  }, [scheduleReminderForCounter, cancelReminderForCounter]);
+
+  const handleDeleteCounter = useCallback(async (id: string) => {
+    const remainingCounters = counters.filter(counter => counter.id !== id);
+    setCounters(remainingCounters);
+    setCounterStates(prev => {
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
     });
-    const weeklyMaalas = activeCounter ? weekKeys.reduce((acc, dk) => {
-      const st = statsByDay[dk]?.[activeCounter.id];
-      if (!st) return acc;
-      return acc + derivedMaalas(st.rawCounts, st.manualMaalasDelta, activeCounter.cycleSize);
-    }, 0) : 0;
-    const weeklyTarget = (activeCounter?.target ?? 0) * 7;
-    const weeklyPct = weeklyTarget > 0 ? Math.min(100, Math.round((weeklyMaalas / weeklyTarget) * 100)) : 0;
 
-    return (
-      <div className="p-6 space-y-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}>
-        {/* Header */}
-        <div className="sticky top-0 z-40 -mx-6 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border flex items-center justify-between">
-          <h2 className="text-xl font-bold">Practice History</h2>
-          <div className="text-xs text-muted-foreground">Today</div>
-        </div>
+    if (activeCounterId === id) {
+      setActiveCounterId(remainingCounters[0]?.id || "");
+    }
 
-        {/* Today Summary Card */}
-        <Card className="shadow-elevated gradient-primary/5">
-          <CardContent className="pt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="font-semibold text-foreground flex items-center gap-2">
-                <span className="text-muted-foreground">📅</span>
-                {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-              </div>
-              <div className="text-xs text-muted-foreground">{(day.rawCounts % cycle)} / {cycle}</div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <StatsCard title="MALAS" value={todayMaalas} variant="streak" />
-              <StatsCard title="TAPS" value={day.rawCounts} variant="today" />
-              <StatsCard title="TO NEXT" value={tapsToNext} variant="total" />
-            </div>
-            <div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>Progress</span>
-                <span>{Math.round(((day.rawCounts % cycle) / cycle) * 100)}%</span>
-              </div>
-              <div className="h-2 w-full bg-muted rounded">
-                <div className="h-2 rounded gradient-primary" style={{ width: `${Math.round(((day.rawCounts % cycle) / cycle) * 100)}%` }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    await cancelReminderForCounter(id);
+    toast.success("Practice deleted");
+  }, [cancelReminderForCounter, counters, activeCounterId]);
+  const handleSettingToggle = (setting: keyof Settings) => { setSettings(prev => ({ ...prev, [setting]: !prev[setting] })); };
+  const handleResetTutorial = useCallback(() => {
+    const storageKeys = [
+      "divine-counter-onboarded",
+      "divine-counter-counters",
+      "divine-counter-states",
+      "divine-counter-history",
+      "divine-counter-journal",
+      "divine-counter-settings",
+      "divine-counter-active",
+      "divine-counter-username",
+      "divine-counter-unlocked-rewards",
+      "divine-counter-longest-streak",
+      "divine-counter-milestones",
+      "divine-counter-rewards",
+    ];
 
-        {/* Manual Adjustments */}
-        <Card className="shadow-elevated">
-          <CardHeader>
-            <CardTitle className="text-base">Manual Adjustments</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">Need corrections? Use these when you practiced off-device or tapped by mistake.</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button disabled={!activeCounter} onClick={manualAddMaala} className="font-semibold" variant="primaryGradient">
-                <PlusCircle size={16} /> Add Mala
-              </Button>
-              <Button variant="outline" disabled={!activeCounter} onClick={manualRemoveMaala} className="font-semibold border-destructive text-destructive hover:bg-destructive hover:text-white">
-                <Minus size={16} /> Remove Mala
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">Tip: Adjustments change today’s derived maalas without altering raw taps.</p>
-          </CardContent>
-        </Card>
+    storageKeys.forEach((key) => localStorage.removeItem(key));
 
-        {/* Weekly Progress */}
-        <Card className="shadow-elevated">
-          <CardHeader>
-            <CardTitle className="text-base">This Week</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="h-2 w-full bg-muted rounded">
-              <div className="h-2 rounded gradient-primary" style={{ width: `${weeklyPct}%` }} />
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {weeklyTarget > 0 ? `${weeklyMaalas} of ${weeklyTarget} maalas • ${weeklyPct}%` : `${weeklyMaalas} maalas this week`}
-            </div>
-          </CardContent>
-        </Card>
+    setIsNotificationPending(false);
+    setIsAddCounterModalOpen(false);
+    setShowRewardModal(false);
+    setPendingRewards([]);
+    setNewRewards([]);
+    setNewReward(null);
 
-        {/* Recent Days */}
-        <Card className="shadow-elevated">
-          <CardHeader>
-            <CardTitle className="text-base">Recent Days</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {rows.length === 0 && (
-              <p className="text-sm text-muted-foreground">No recent entries for this counter.</p>
-            )}
-            {rows.map(row => (
-              <div key={row.dk} className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-foreground">{fmtDay(row.dk)}</span>
-                  <span className="text-muted-foreground">{row.raw} taps • {row.mal} maala{row.mal!==1?'s':''}</span>
-                </div>
-                <div className="h-1.5 w-full bg-muted rounded">
-                  <div className="h-1.5 rounded bg-primary" style={{ width: `${row.pct}%` }} />
-                </div>
-                <div className="text-xs">
-                  {row.status === 'completed' && <span className="px-2 py-0.5 rounded bg-[var(--success)] text-white">Goal reached</span>}
-                  {row.status === 'partial' && <span className="px-2 py-0.5 rounded bg-[var(--warning)] text-white">Partial</span>}
-                  {row.status === 'missed' && <span className="px-2 py-0.5 rounded bg-[var(--error)] text-white">Missed</span>}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.cancelAll().catch(error => console.error("Failed to cancel notifications during reset", error));
+    }
 
-  const CountersScreen = () => (
-    <div className="p-6 pb-24 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Counters</h2>
-        <Button onClick={() => { setEditingCounter(null); setCurrentScreen('addCounter'); }}><PlusCircle size={16} className="mr-2" />Add</Button>
-      </div>
-      <div className="space-y-2">
-        {counters.filter(c => !c.archived).map(c => (
-          <Card key={c.id} className={cn('cursor-pointer', activeCounterId===c.id && 'border-primary')} onClick={() => setActiveCounterId(c.id)}>
-            <CardContent className="py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: c.color }} />
-                <div>
-                  <div className="font-medium">{c.name}</div>
-                  <div className="text-xs text-muted-foreground">{c.cycleSize} count • target {c.target}/day</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-sm text-muted-foreground">{c.todayMaalas} / {c.totalMaalas} maal.</div>
-                <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); archiveCounter(c.id); }}>Archive</Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {counters.length===0 && (
-          <div className="text-sm text-muted-foreground">No counters yet. Click Add to create one.</div>
-        )}
-      </div>
-      <CreateCounterDialog
-        open={showCounterDialog}
-        onOpenChange={setShowCounterDialog}
-        onSave={(cc: any) => {
-          // Map dialog counter shape to spec shape
-          createCounter({ name: cc.name, color: cc.color, cycleSize: cc.cycleSize, target: cc.target });
-        }}
-        editingCounter={editingCounter as any}
-      />
-    </div>
-  );
+    setCounters([]);
+    setActiveCounterId("");
+    setCounterStates({});
+    setHistory([]);
+    setJournalEntries([]);
+    setUnlockedRewards([]);
+    setStreak(0);
+    setLongestStreak(0);
+    setRewards(REWARDS.map(reward => ({ ...reward, isUnlocked: false })));
+    setMilestones(hydrateMilestones());
 
-  const SettingsScreen = () => {
-    const appVersion = '1.0.0';
-    const practicingSince = user ? new Date(user.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : undefined;
-    const streak = activeCounter?.streak ?? 0;
-    const totalMaalas = activeCounter?.totalMaalas ?? 0;
+    setSettings({ hapticsEnabled: true, volumeKeyControl: true });
+    setUserName("");
+    setOnboardingData({ userName: "" });
+    setEditingCounterId("");
 
-    return (
-      <div className="p-6 pb-24">
-        {/* Header */}
-        <div className="sticky top-0 z-40 -mx-6 px-6 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => setCurrentScreen('counter')} aria-label="Back">
-              <ChevronLeft />
-            </Button>
-            <h1 className="text-xl font-bold text-foreground">Settings</h1>
-          </div>
-          <div className="text-xs font-medium text-[color:var(--success)]">✓ Saved</div>
-        </div>
-
-        {/* Content */}
-        <div className="mt-4 max-w-[420px] mx-auto space-y-4">
-          {/* Profile */}
-          <Card className="shadow-elevated">
-            <CardContent className="pt-5 text-center space-y-1">
-              <div className="font-semibold text-foreground">{user?.name || 'Friend'}</div>
-              {practicingSince && (
-                <div className="text-sm text-muted-foreground">Practicing since {practicingSince}</div>
-              )}
-              <div className="text-sm text-muted-foreground">{streak}-day streak • {totalMaalas} total malas</div>
-            </CardContent>
-          </Card>
-
-          {/* Notifications removed */}
-
-          {/* Appearance */}
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-foreground flex items-center gap-2">🎨 Appearance</div>
-            <Card className="shadow-elevated">
-              <CardContent className="pt-4 space-y-4">
-                <div className="grid grid-cols-2 items-center gap-2">
-                  <div className="font-medium">Theme</div>
-                  <Select value={settings.darkMode} onValueChange={(v: DarkModePref)=> setSettings(s=> ({ ...s, darkMode: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Auto" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto</SelectItem>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <div className="font-medium mb-2">Accent Color</div>
-                  <ThemeSelector currentTheme={settings.theme} onThemeChange={(t) => setTheme(t as any)} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Practice Settings */}
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-foreground flex items-center gap-2">🧘‍♂️ Practice Settings</div>
-            <Card className="shadow-elevated">
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">Haptic Feedback</div>
-                    <div className="text-xs text-muted-foreground">Vibration on mala completion</div>
-                  </div>
-                  <Switch checked={settings.hapticsEnabled} onCheckedChange={setHaptics} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Data & Privacy */}
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-foreground flex items-center gap-2">📊 Data & Privacy</div>
-            <Card className="shadow-elevated">
-              <CardContent className="pt-2">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between text-left">
-                      <span>
-                        <div className="font-medium text-destructive">Reset All Data</div>
-                        <div className="text-xs text-muted-foreground">Permanently delete everything</div>
-                      </span>
-                      <span className="opacity-60">🗑️</span>
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Reset all data?</AlertDialogTitle>
-                      <AlertDialogDescription>This will delete all counters, history, and settings on this device. This cannot be undone.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => { setIsFirstRun(true); setUser(null); setCounters([]); setActiveCounterId(undefined); setStatsByDay({}); toast.success('All data reset'); }}>Reset</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Help & Support (with simple search filter) */}
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-foreground flex items-center gap-2">ℹ️ Help & Support</div>
-            <Card className="shadow-elevated">
-              <CardContent className="space-y-2 pt-2">
-                {(search.trim()==='' || 'user guide'.includes(search.toLowerCase())) && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">User Guide<span className="opacity-60">📖</span></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>User Guide</DialogTitle></DialogHeader>
-                    <div className="space-y-3 text-sm text-foreground">
-                      <div>
-                        <div className="font-medium">Start</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>Tap “+” to add a counter</li>
-                          <li>Name it (e.g., “Gayatri Mantra”)</li>
-                          <li>Choose cycle: 108 / 54 / 27 / 21 or Custom</li>
-                          <li>Set a daily goal</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="font-medium">Count</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>Tap the big circle for +1</li>
-                          <li>Use the small “−1” button to correct</li>
-                          <li>The ring shows progress toward the cycle</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="font-medium">Track</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>History shows daily stats</li>
-                          <li>Manual adjust maalas if needed</li>
-                          <li>See streaks and weekly completion</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="font-medium">Tips</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>Practice at the same time daily</li>
-                          <li>Restart phone if the app feels slow</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>)}
-                {(search.trim()==='' || 'contact'.includes(search.toLowerCase())) && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">Contact Support<span className="opacity-60">💬</span></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Support</DialogTitle></DialogHeader>
-                    <div className="space-y-3 text-sm text-foreground">
-                      <div className="font-medium">Contact</div>
-                      <p className="text-muted-foreground">Email: pbrahmapurkar@gmail.com • Usually replies within 24–48 hours</p>
-                      <div className="font-medium">Include</div>
-                      <ul className="list-disc pl-5 text-muted-foreground">
-                        <li>Phone model</li>
-                        <li>What happened?</li>
-                        <li>App version: 1.0.0</li>
-                      </ul>
-                      <div className="font-medium">Try first</div>
-                      <ol className="list-decimal pl-5 text-muted-foreground">
-                        <li>Restart the app</li>
-                        <li>Restart your phone</li>
-                        <li>Update the app</li>
-                        <li>Free storage space</li>
-                      </ol>
-                    </div>
-                  </DialogContent>
-                </Dialog>)}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Legal & Information (with simple search filter) */}
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-foreground flex items-center gap-2">📄 Legal & Information</div>
-            <Card className="shadow-elevated">
-              <CardContent className="space-y-2 pt-2">
-                {(search.trim()==='' || 'about'.includes(search.toLowerCase())) && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">About<span className="opacity-60">ℹ️</span></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>About</DialogTitle></DialogHeader>
-                    <div className="space-y-4 text-foreground text-sm">
-                      <div className="text-center space-y-1">
-                        <div className="text-2xl font-semibold">Divine Counter</div>
-                        <div className="inline-flex items-center gap-2 rounded-full border px-2 py-0.5 text-xs text-muted-foreground">Version {appVersion}</div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="font-medium">Purpose</div>
-                        <p className="text-muted-foreground">Simple, beautiful counting for a consistent daily practice.</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="font-medium">Highlights</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>Clean, tap-to-count interface</li>
-                          <li>Multiple cycle sizes with custom option</li>
-                          <li>Progress tracking and weekly insight</li>
-                          <li>Optional haptics</li>
-                          <li>Light/Dark themes</li>
-                        </ul>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="font-medium">Privacy</div>
-                        <p className="text-muted-foreground">All data stays on your device. No accounts, no tracking.</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="font-medium">Contact</div>
-                        <p className="text-muted-foreground">pbrahmapurkar@gmail.com</p>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>)}
-
-                {(search.trim()==='' || 'privacy'.includes(search.toLowerCase())) && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">Privacy Policy<span className="opacity-60">🔒</span></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Privacy Policy</DialogTitle></DialogHeader>
-                    <div className="space-y-3 text-foreground text-sm">
-                      <p className="text-muted-foreground">We respect your privacy. Divine Counter is designed to keep your practice local to your device.</p>
-                      <h4 className="font-medium">Local Storage</h4>
-                      <p className="text-muted-foreground">All practice data stays on your device. No accounts, no servers, no analytics.</p>
-                      <h4 className="font-medium">Optional Permissions</h4>
-                      <p className="text-muted-foreground">Haptic feedback.</p>
-                      <p className="text-xs text-muted-foreground">Last updated: 14 Sep 2025</p>
-                    </div>
-                  </DialogContent>
-                </Dialog>)}
-
-                {(search.trim()==='' || 'terms'.includes(search.toLowerCase())) && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">Terms<span className="opacity-60">📋</span></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Terms</DialogTitle></DialogHeader>
-                    <div className="space-y-3 text-foreground text-sm">
-                      <div className="text-muted-foreground">Version {appVersion} • Sept 2025</div>
-                      <div>
-                        <div className="font-medium">You May</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>Use for personal practice</li>
-                          <li>Track your counting and progress</li>
-                          <li>Share feedback</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="font-medium">Don’t</div>
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                          <li>Resell or redistribute</li>
-                          <li>Use disrespectfully</li>
-                          <li>Reverse engineer</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="font-medium">Disclaimer</div>
-                        <p className="text-muted-foreground">App provided “as is”. No guarantees. May contain bugs.</p>
-                      </div>
-                      <div>
-                        <div className="font-medium">Legal</div>
-                        <p className="text-muted-foreground">Indian law applies • Contact: pbrahmapurkar@gmail.com</p>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>)}
-
-                {(search.trim()==='' || 'license licenses credits'.includes(search.toLowerCase())) && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">Licenses<span className="opacity-60">🔓</span></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Licenses</DialogTitle></DialogHeader>
-                    <div className="space-y-3 text-foreground text-sm">
-                      <p className="text-muted-foreground">Built using wonderful open‑source libraries:</p>
-                      <ul className="list-disc pl-5 text-muted-foreground">
-                        <li>React (MIT) — App framework</li>
-                        <li>Capacitor (MIT) — Native features</li>
-                        <li>TypeScript (Apache) — Development</li>
-                        <li>Lucide React (ISC) — Icons</li>
-                        <li>Framer Motion (MIT) — Animations</li>
-                      </ul>
-                      <div className="text-muted-foreground">Questions? pbrahmapurkar@gmail.com</div>
-                    </div>
-                  </DialogContent>
-                </Dialog>)}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Footer */}
-          <div className="text-center text-xs text-muted-foreground space-y-1">
-            <div>Made with 🙏 for your spiritual journey</div>
-            <div>Version {appVersion}</div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (!hasBooted) return <BootScreen />;
-
-  // Onboarding guard - must onboard if first run, no user, or no counters
-  const mustOnboard = isFirstRun || !user || counters.length === 0;
+    setIsOnboarding(true);
+    setOnboardingStep("greeting");
+    setCurrentScreen("home");
+  }, []);
+  const handleAddJournalEntry = (entry: JournalEntry) => { /* ... */ };
   
-  if (mustOnboard) {
+  // Reward system handlers
+  const handleClaimReward = (rewardId: string) => {
+    setRewards(prev => prev.map(reward => 
+      reward.id === rewardId 
+        ? { ...reward, isUnlocked: true, unlockedAt: new Date().toISOString() }
+        : reward
+    ));
+    setUnlockedRewards(prev => [...prev, rewardId]);
+    toast.success("Reward claimed! 🎉");
+  };
+  
+  const activeCounter = counters.find(c => c.id === activeCounterId);
+  const activeCounterState = activeCounterId ? counterStates[activeCounterId] : null;
+
+  // Render Logic (No Changes)
+  if (isBooting) {
+    return <BootScreen onComplete={() => setIsBooting(false)} />;
+  }
+
+  if (isOnboarding) {
     return (
-      <OBNew
-        onComplete={(p) => {
-          const now = Date.now();
-          setUser({ id: String(now), name: p.userName || 'Seeker', createdAt: now });
-          createCounter({ name: p.counter.name, color: p.counter.color, cycleSize: p.cycleSize, target: p.counter.target });
-          setIsFirstRun(false);
-          setCurrentScreen('counter');
-        }}
-        onSkip={() => {
-          const now = Date.now();
-          setUser({ id: String(now), name: '', createdAt: now });
-          createCounter({ name: 'My Practice', color: '#34C759', cycleSize: 108, target: 1 });
-          setIsFirstRun(false);
-        }}
-      />
+      <div className="min-h-screen">
+        {onboardingStep === "greeting" && <WelcomingRitualStep1 onNext={handleGreetingNext} />}
+        {onboardingStep === "practice" && <WelcomingRitualStep2 userName={onboardingData.userName} onNext={handlePracticeNext} onBack={() => setOnboardingStep("greeting")} />}
+        {onboardingStep === "affirmation" && onboardingData.practiceData && <WelcomingRitualStep3 userName={onboardingData.userName} practiceData={onboardingData.practiceData} onComplete={handleOnboardingComplete} onBack={() => setOnboardingStep("practice")} />}
+      </div>
     );
   }
 
   return (
-    <MobileContainer>
-      <AnimatePresence mode="wait">
-        <motion.main
-          key={currentScreen}
-          initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
-          animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
-          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -12 }}
-          transition={{ duration: 0.20, ease: 'easeOut' }}
-          className="min-h-screen"
-        >
-          {currentScreen === 'counter' && <CounterScreen />}
-          {currentScreen === 'settings' && (
-            <SettingsPanel
-              version={'1.0.0'}
-              settings={{
-                hapticsEnabled: settings.hapticsEnabled,
-                dark: settings.darkMode === 'dark',
-                theme: (settings.theme === 'spiritual' ? 'saffron' : settings.theme === 'calm' ? 'blue' : 'green') as any,
-                customColor: (settings as any).customColor,
-                defaultCounterId: settings.defaultCounterId,
-              }}
-              counters={counters.map(c => ({ id: c.id, name: c.name }))}
-              setTheme={(t)=> setSettings(s=> ({ ...s, theme: t==='saffron' ? 'spiritual' : t==='blue' ? 'calm' : 'nature' }))}
-              setCustomColor={(hex)=> setSettings(s=> ({ ...(s as any), customColor: hex }))}
-              setDark={(on)=> setSettings(s=> ({ ...s, darkMode: on ? 'dark' : 'light' }))}
-              setHaptics={setHaptics}
-              setVolumeButtonsEnabled={(on)=> setSettings(s=> ({ ...s, volumeButtonsEnabled: on }))}
-              setDefaultCounter={(id)=> setSettings(s=> ({ ...s, defaultCounterId: id }))}
-              resetOnboarding={()=> { const now=Date.now(); setIsFirstRun(true); setUser(null); setCounters([]); setActiveCounterId(undefined); setStatsByDay({}); setCurrentScreen('counter'); }}
-              goBack={()=> setCurrentScreen('counter')}
-            />
-          )}
-          {currentScreen === 'history' && <HistoryScreen />}
-          {currentScreen === 'counters' && <CountersScreen />}
-          {currentScreen === 'addCounter' && (
-            <CreateCounterPage
-              onCancel={() => setCurrentScreen('counters')}
-              onSave={(input) => { createCounter(input); setCurrentScreen('counters'); }}
-            />
-          )}
-        </motion.main>
-      </AnimatePresence>
-      <Navigation />
-      
-      {/* Dev-only diagnostics panel */}
-      <DiagnosticsPanel
-        currentScreen={currentScreen}
-        activeCounterId={activeCounterId}
-        activeCounterName={activeCounter?.name}
-        cycleSize={activeCounter?.cycleSize}
-        todayRaw={activeCounter ? (statsByDay[dayKey()]?.[activeCounter.id]?.rawCounts ?? 0) : 0}
-        todayDerivedMaalas={activeCounter?.todayMaalas ?? 0}
-        hapticsEnabled={settings.hapticsEnabled}
-        onSimulateBoundaryCross={() => {
-          if (activeCounter) {
-            const k = dayKey();
-            const day = statsByDay[k]?.[activeCounter.id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-            const prevRaw = day.rawCounts;
-            const nextRaw = 108; // Simulate 107→108
-            setStatsByDay(prev => ({
-              ...prev,
-              [k]: { ...(prev[k]||{}), [activeCounter.id]: { ...day, rawCounts: nextRaw } }
-            }));
-            setCounters(cs => cs.map(c => c.id === activeCounter.id ? {
-              ...c,
-              totalCount: c.totalCount + (nextRaw - prevRaw),
-              todayCount: nextRaw,
-              todayMaalas: Math.floor(nextRaw / c.cycleSize),
-              totalMaalas: c.totalMaalas + 1,
-              updatedAt: Date.now()
-            } : c));
-          }
-        }}
-        onSimulateBelowBoundary={() => {
-          if (activeCounter) {
-            const k = dayKey();
-            const day = statsByDay[k]?.[activeCounter.id] ?? { rawCounts: 0, manualMaalasDelta: 0 };
-            const prevRaw = day.rawCounts;
-            const nextRaw = 107; // Simulate 110→107
-            setStatsByDay(prev => ({
-              ...prev,
-              [k]: { ...(prev[k]||{}), [activeCounter.id]: { ...day, rawCounts: nextRaw } }
-            }));
-            setCounters(cs => cs.map(c => c.id === activeCounter.id ? {
-              ...c,
-              totalCount: Math.max(0, c.totalCount - (prevRaw - nextRaw)),
-              todayCount: nextRaw,
-              todayMaalas: Math.floor(nextRaw / c.cycleSize),
-              totalMaalas: Math.max(0, c.totalMaalas - 1),
-              updatedAt: Date.now()
-            } : c));
-          }
-        }}
-        onAddMaala={manualAddMaala}
-        onRemoveMaala={manualRemoveMaala}
+    <div className="min-h-screen bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="pb-20">
+        {currentScreen === "home" && activeCounter && activeCounterState && (
+          <HomeScreen
+            counter={activeCounter}
+            currentCount={activeCounterState.currentCount}
+            todayProgress={activeCounterState.todayProgress}
+            streak={streak}
+            userName={userName}
+            onIncrement={handleIncrement}
+            onDecrement={handleDecrement}
+            onResetCurrentCount={resetCurrentCount}
+            hapticsEnabled={settings.hapticsEnabled}
+          />
+        )}
+        {currentScreen === "history" && activeCounter && activeCounterState && (
+          <PracticeJournalScreen
+            counterName={activeCounter.name}
+            todayProgress={activeCounterState.todayProgress}
+            dailyGoal={activeCounter.dailyGoal}
+            streak={streak}
+            longestStreak={longestStreak}
+            history={history}
+            activePracticeId={activeCounter.id}
+            journalEntries={journalEntries}
+            unlockedRewards={unlockedRewards}
+            milestones={milestones}
+            onAddJournalEntry={handleAddJournalEntry}
+          />
+        )}
+        {currentScreen === "counters" && (
+          <CountersScreen
+            counters={counters}
+            activeCounterId={activeCounterId}
+            counterStates={counterStates}
+            onSelectCounter={handleSelectCounter}
+            onAddCounter={() => setIsAddCounterModalOpen(true)}
+            onEditCounter={handleEditCounter}
+            onDeleteCounter={handleDeleteCounter}
+            onNavigateToAddPractice={() => setCurrentScreen("add-practice")}
+          />
+        )}
+        {currentScreen === "settings" && (
+          <SettingsScreen
+            hapticsEnabled={settings.hapticsEnabled}
+            onHapticsToggle={() => handleSettingToggle("hapticsEnabled")}
+            volumeKeyControlEnabled={settings.volumeKeyControl}
+            onVolumeKeyControlToggle={() => handleSettingToggle("volumeKeyControl")}
+            onResetTutorial={handleResetTutorial}
+            onOpenInfoPage={(key) => setCurrentScreen(key as AppScreen)}
+          />
+        )}
+        {currentScreen === "about" && (
+          <AboutPage onBack={() => setCurrentScreen("settings")} />
+        )}
+        {currentScreen === "privacy" && (
+          <PrivacyPolicyPage onBack={() => setCurrentScreen("settings")} />
+        )}
+        {currentScreen === "terms" && (
+          <TermsOfServicePage onBack={() => setCurrentScreen("settings")} />
+        )}
+        {currentScreen === "edit-practice" && editingCounterId && (
+          <EditPracticeScreen
+            counter={counters.find(c => c.id === editingCounterId)!}
+            onSave={handleUpdateCounter}
+            onBack={() => setCurrentScreen("counters")}
+            rewards={rewards}
+          />
+        )}
+        {currentScreen === "add-practice" && (
+          <AddPracticeScreen
+            onSave={handleAddCounter}
+            onBack={() => setCurrentScreen("counters")}
+          />
+        )}
+      </div>
+      {!["edit-practice", "add-practice", "about", "privacy", "terms"].includes(currentScreen) && (
+      <BottomNavigation
+        activeScreen={currentScreen}
+          onNavigate={(screen) => setCurrentScreen(screen as AppScreen)}
+        />
+      )}
+      <AddCounterModal
+        isOpen={isAddCounterModalOpen}
+        onClose={() => setIsAddCounterModalOpen(false)}
+        onAdd={handleAddCounter}
       />
-    </MobileContainer>
+      
+      {/* Reward Unlock Modal */}
+      <RewardUnlockModal
+        isOpen={showRewardModal}
+        onClose={() => setShowRewardModal(false)}
+        rewards={newRewards}
+        onClaim={handleClaimReward}
+      />
+    </div>
   );
 }

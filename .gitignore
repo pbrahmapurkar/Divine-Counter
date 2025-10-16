@@ -7,8 +7,7 @@ yarn-error.log*
 # Build outputs
 build/
 dist/
-*.tgz
-*.tar.gz
+out/
 
 # Environment variables
 .env
@@ -33,9 +32,30 @@ dist/
 ehthumbs.db
 Thumbs.db
 
+# Capacitor
+android/app/build/
+android/build/
+android/.gradle/
+android/captured_assets/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/app/release/
+android/app/debug/
+
+# iOS
+ios/App/App/public/
+ios/App/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/App/Pods/
+ios/App/App/App.xcworkspace/xcshareddata/
+ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/
+
 # Logs
-logs
 *.log
+logs/
 
 # Runtime data
 pids
@@ -45,7 +65,6 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage/
-*.lcov
 
 # nyc test coverage
 .nyc_output
@@ -78,31 +97,30 @@ jspm_packages/
 .cache
 .parcel-cache
 
-# Next.js build output
+# next.js build output
 .next
 
-# Nuxt.js build / generate output
+# nuxt.js build output
 .nuxt
 
-# Gatsby files
-.cache/
-public
+# vuepress build output
+.vuepress/dist
 
-# Storybook build outputs
-.out
-.storybook-out
+# Serverless directories
+.serverless
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
 
 # Temporary folders
 tmp/
 temp/
-
-# Capacitor
-android/app/build/
-ios/build/
-
-# APK files (keep source, not built APKs)
-*.apk
-
-# Test results
-test-results/
-playwright-report/

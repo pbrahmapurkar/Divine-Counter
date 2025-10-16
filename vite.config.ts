@@ -3,8 +3,6 @@
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
 
-  const useCapStubs = process.env.CAP_USE_STUBS !== 'false';
-
   export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -19,6 +17,7 @@
         'next-themes@0.4.6': 'next-themes',
         'lucide-react@0.487.0': 'lucide-react',
         'input-otp@1.4.2': 'input-otp',
+        'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png': path.resolve(__dirname, './src/assets/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png'),
         'embla-carousel-react@8.6.0': 'embla-carousel-react',
         'cmdk@1.1.1': 'cmdk',
         'class-variance-authority@0.7.1': 'class-variance-authority',
@@ -48,12 +47,6 @@
         '@radix-ui/react-aspect-ratio@1.1.2': '@radix-ui/react-aspect-ratio',
         '@radix-ui/react-alert-dialog@1.1.6': '@radix-ui/react-alert-dialog',
         '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
-        // Capacitor plugin stubs so web build works without native plugins
-        ...(useCapStubs ? {
-          '@capacitor/preferences': path.resolve(__dirname, './src/capacitor-stubs/preferences.ts'),
-          '@capacitor/local-notifications': path.resolve(__dirname, './src/capacitor-stubs/local-notifications.ts'),
-          '@capacitor/app': path.resolve(__dirname, './src/capacitor-stubs/app.ts'),
-        } : {}),
         '@': path.resolve(__dirname, './src'),
       },
     },

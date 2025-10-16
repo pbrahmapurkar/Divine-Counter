@@ -1,11 +1,14 @@
 {
-      "name": "Jappa Counter App Design",
+      "name": "Mantra Counting App Design (Community)",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
-            "@capacitor/android": "^6.0.0",
-            "@capacitor/cli": "^6.0.0",
-            "@capacitor/core": "^6.0.0",
+            "@capacitor-community/volume-buttons": "^6.0.1",
+            "@capacitor/android": "^6.1.2",
+            "@capacitor/app": "^6.0.2",
+            "@capacitor/haptics": "^6.0.2",
+            "@capacitor/ios": "^6.1.2",
+            "@capacitor/local-notifications": "^6.1.2",
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
             "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -51,23 +54,17 @@
             "vaul": "^1.1.2"
       },
       "devDependencies": {
-            "@testing-library/jest-dom": "^6.6.3",
-            "@testing-library/react": "^16.1.0",
-            "@testing-library/user-event": "^14.5.2",
+            "@capacitor/assets": "^3.0.5",
+            "@capacitor/cli": "^6.2.1",
+            "@capacitor/core": "^6.1.2",
             "@types/node": "^20.10.0",
-            "@types/react": "^18.3.12",
-            "@types/react-dom": "^18.3.1",
             "@vitejs/plugin-react-swc": "^3.10.2",
-            "jsdom": "^26.1.0",
-            "typescript": "^5.6.3",
-            "vite": "6.3.5",
-            "vitest": "^2.1.8"
+            "vite": "^6.3.6"
       },
       "scripts": {
             "dev": "vite",
             "build": "vite build",
-            "preview": "vite preview",
-            "typecheck": "tsc --noEmit",
-            "test": "vitest"
+            "generate-icons": "node generate-android-icons.js",
+            "setup-android": "npm run generate-icons && npx cap sync"
       }
 }
