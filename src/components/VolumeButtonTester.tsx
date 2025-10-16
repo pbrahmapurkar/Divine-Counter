@@ -17,21 +17,18 @@ export function VolumeButtonTester({ enabled, onVolumeUp, onVolumeDown }: Volume
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Detect if we're on an emulator or web browser
-    const isEmulatorOrWeb = 
-      typeof window !== 'undefined' && 
-      (window.navigator.userAgent.includes('Android') === false || 
-       window.navigator.userAgent.includes('Emulator') ||
-       !window.matchMedia('(hover: none)').matches);
+    // Always show test buttons when volume control is enabled
+    // This ensures they work in emulators, web browsers, and even physical devices as backup
+    setIsVisible(enabled);
 
-    // Show tester if volume control is enabled and we're likely on emulator/web
-    setIsVisible(enabled && isEmulatorOrWeb);
-
-    if (enabled && isEmulatorOrWeb) {
+    if (enabled) {
+      console.log("🧪 VolumeButtonTester: Test buttons are now visible");
       toast.info(
-        "🧪 Testing mode active! Use on-screen buttons below to simulate volume keys.",
+        "🧪 Volume test buttons active! Look for floating buttons or use Arrow Up/Down keys.",
         { duration: 4000 }
       );
+    } else {
+      console.log("🧪 VolumeButtonTester: Test buttons hidden (volume control disabled)");
     }
   }, [enabled]);
 
