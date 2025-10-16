@@ -22,6 +22,8 @@ type InfoSheetKey = "about" | "privacy" | "terms";
 interface SettingsScreenProps {
   hapticsEnabled: boolean;
   onHapticsToggle: () => void;
+  volumeKeyControlEnabled: boolean;
+  onVolumeKeyControlToggle: () => void;
   onResetTutorial: () => void;
   onOpenInfoPage: (page: InfoSheetKey) => void;
 }
@@ -60,6 +62,8 @@ interface SettingsCardConfig {
 export function SettingsScreen({
   hapticsEnabled,
   onHapticsToggle,
+  volumeKeyControlEnabled,
+  onVolumeKeyControlToggle,
   onResetTutorial,
   onOpenInfoPage
 }: SettingsScreenProps) {
@@ -85,8 +89,10 @@ export function SettingsScreen({
           {
             icon: Volume2,
             label: "Volume Key Control",
-            subtitle: "Use volume keys to count (Beta)",
-            type: "comingSoon"
+            subtitle: "Use the device volume keys to count",
+            type: "toggle",
+            value: volumeKeyControlEnabled,
+            onChange: onVolumeKeyControlToggle
           }
         ]
       },
@@ -127,7 +133,7 @@ export function SettingsScreen({
         ]
       }
     ],
-    [hapticsEnabled, onHapticsToggle]
+    [hapticsEnabled, onHapticsToggle, volumeKeyControlEnabled, onVolumeKeyControlToggle]
   );
 
   const handleAction = (action: SettingsActionItem["action"]) => {

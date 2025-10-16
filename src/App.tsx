@@ -629,6 +629,102 @@ export default function App() {
     setCounterStates(prev => ({ ...prev, [activeCounterId]: { ...currentState, currentCount: currentState.currentCount - 1 } }));
   }, [activeCounterId, counterStates, settings.hapticsEnabled]);
 
+  useEffect(() => {
+    if (!settings.volumeKeyControl) {
+      console.debug("Volume key control is disabled");
+      return;
+    }
+
+    if (!activeCounterId) {
+      console.debug("Volume key control requires an active counter");
+      return;
+    }
+
+    if (!Capacitor.isNativePlatform()) {
+      console.debug("Volume key control is only available on a native device");
+      return;
+    }
+
+    let isActive = true;
+    let volumeButtons: typeof import("@capacitor-community/volume-buttons")["VolumeButtons"] | null = null;
+    let modulePromise: Promise<typeof import("@capacitor-community/volume-buttons")> | null = null;
+
+    const setupVolumeControl = async () => {
+      try {
+        console.debug("Setting up volume key control...");
+        modulePromise = import("@capacitor-community/volume-buttons");
+        const module = await modulePromise;
+        volumeButtons = module.VolumeButtons;
+
+        if (!isActive) {
+          return;
+        }
+
+        try {
+          const status = await volumeButtons.isWatching();
+          if (status.value) {
+            await volumeButtons.clearWatch();
+            console.debug("Existing volume key control watcher cleared before re-initializing");
+          }
+        } catch (statusError) {
+          console.debug("Unable to verify existing volume key control watcher", statusError);
+        }
+
+        await volumeButtons.watchVolume({ suppressVolumeIndicator: true }, (event) => {
+          if (!isActive) {
+            return;
+          }
+
+          if (event.direction === "up") {
+            console.debug("Volume UP pressed - incrementing count");
+            handleIncrement();
+          } else if (event.direction === "down") {
+            console.debug("Volume DOWN pressed - decrementing count");
+            handleDecrement();
+          }
+        });
+
+        console.debug("Volume buttons watcher started successfully");
+      } catch (error) {
+        console.error("Failed to set up volume key control", error);
+      }
+    };
+
+    setupVolumeControl();
+
+    return () => {
+      isActive = false;
+
+      (async () => {
+        try {
+          const module = volumeButtons
+            ? { VolumeButtons: volumeButtons }
+            : modulePromise
+              ? await modulePromise
+              : null;
+          const buttons = module?.VolumeButtons;
+
+          if (!buttons) {
+            return;
+          }
+
+          try {
+            await buttons.clearWatch();
+            console.debug("Volume key control watcher cleared");
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("not been been watched")) {
+              console.debug("Volume key control watcher was already cleared");
+              return;
+            }
+            throw error;
+          }
+        } catch (error) {
+          console.error("Failed to clean up volume key control", error);
+        }
+      })();
+    };
+  }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
+
   const resetCurrentCount = useCallback(() => {
     if (!activeCounterId) return;
     const currentState = counterStates[activeCounterId];
@@ -830,6 +926,8 @@ export default function App() {
           <SettingsScreen
             hapticsEnabled={settings.hapticsEnabled}
             onHapticsToggle={() => handleSettingToggle("hapticsEnabled")}
+            volumeKeyControlEnabled={settings.volumeKeyControl}
+            onVolumeKeyControlToggle={() => handleSettingToggle("volumeKeyControl")}
             onResetTutorial={handleResetTutorial}
             onOpenInfoPage={(key) => setCurrentScreen(key as AppScreen)}
           />
