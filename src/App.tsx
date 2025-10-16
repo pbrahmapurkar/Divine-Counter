@@ -984,14 +984,6 @@ export default function App() {
         rewards={newRewards}
         onClaim={handleClaimReward}
       />
-      
-      {/* Volume Button Tester - For Emulator/Web Testing */}
-      {console.log("🔍 Debug: currentScreen =", currentScreen, ", volumeKeyControl =", settings.volumeKeyControl)}
-      <VolumeButtonTester
-        enabled={settings.volumeKeyControl}
-        onVolumeUp={handleIncrement}
-        onVolumeDown={handleDecrement}
-      />
     </div>
   );
 }
