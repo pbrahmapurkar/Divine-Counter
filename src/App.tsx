@@ -23,7 +23,6 @@ import { AddPracticeScreen } from "./components/AddPracticeScreen";
 import { toast } from "sonner";
 import { REWARDS, STREAK_MILESTONES, getRewardsByStreak, Reward, StreakMilestone } from "./data/rewards";
 import { RewardUnlockModal } from "./components/RewardUnlockModal";
-import { VolumeButtonTester } from "./components/VolumeButtonTester";
 import { calculateAndUpdateStreak } from "./utils/streaks";
 
 // --- Helper Functions ---
