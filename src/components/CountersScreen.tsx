@@ -14,6 +14,8 @@ interface Counter {
   cycleCount: number;
   dailyGoal: number;
   icon?: string;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
 
 interface CounterState {
@@ -356,13 +358,11 @@ export function CountersScreen({
                       
                       {/* Current count indicator */}
                       <div className="text-xs text-muted-foreground text-right">
-                        {currentCount > 0 ? (
-                          <>
-                            <div>{currentCount}/{counter.cycleCount}</div>
-                            <div>current</div>
-                          </>
-                        ) : (
-                          <div className="opacity-50">← swipe</div>
+                        <div className="opacity-50">← swipe</div>
+                        {currentCount > 0 && (
+                          <div className="mt-1">
+                            {currentCount}/{counter.cycleCount} current
+                          </div>
                         )}
                       </div>
                     </div>

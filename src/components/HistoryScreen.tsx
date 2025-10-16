@@ -6,6 +6,7 @@ interface HistoryEntry {
   date: string;
   count: number;
   goalAchieved: boolean;
+  practiceId: string;
 }
 
 interface HistoryScreenProps {
@@ -43,7 +44,7 @@ export function HistoryScreen({ todayProgress, dailyGoal, streak, history }: His
         <div className="bg-card rounded-lg p-4 mb-6 border border-border">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="font-medium">Today: {todayProgress}/{dailyGoal} malas</span>
+              <span className="font-medium">Today: {todayProgress}/{dailyGoal} cycles</span>
               {todayProgress >= dailyGoal && (
                 <Check size={16} className="text-green-500" />
               )}
@@ -73,7 +74,7 @@ export function HistoryScreen({ todayProgress, dailyGoal, streak, history }: His
                   <span>{formatDate(entry.date)}</span>
                 </div>
                 <span className="text-muted-foreground">
-                  {entry.count} mala{entry.count !== 1 ? 's' : ''}
+                  {entry.count} cycle{entry.count !== 1 ? 's' : ''}
                 </span>
               </div>
             ))

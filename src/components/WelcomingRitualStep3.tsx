@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { User, Circle, Palette, Target, Sparkles } from "lucide-react";
+import { User, Circle, Palette, Target, Sparkles, Clock } from "lucide-react";
 import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
 
 interface Theme {
@@ -20,6 +20,8 @@ interface PracticeData {
   name: string;
   theme: Theme;
   dailyGoal: number;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
 
 interface WelcomingRitualStep3Props {
@@ -30,7 +32,18 @@ interface WelcomingRitualStep3Props {
 }
 
 export function WelcomingRitualStep3({ userName, practiceData, onComplete, onBack }: WelcomingRitualStep3Props) {
-  const { cycleCount, name, theme, dailyGoal } = practiceData;
+  const { cycleCount, name, theme, dailyGoal, reminderEnabled, reminderTime } = practiceData;
+
+  const formatReminderTime = (time: string) => {
+    const [hours, minutes] = time.split(":");
+    if (hours === undefined || minutes === undefined) return "09:00 AM";
+    const hourNumber = parseInt(hours, 10);
+    const minuteNumber = parseInt(minutes, 10);
+    if (Number.isNaN(hourNumber) || Number.isNaN(minuteNumber)) return "09:00 AM";
+    const period = hourNumber >= 12 ? "PM" : "AM";
+    const hour12 = ((hourNumber + 11) % 12) + 1;
+    return `${hour12.toString().padStart(2, '0')}:${minutes} ${period}`;
+  };
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${theme.preview.bg} flex flex-col px-6 py-6 relative overflow-hidden`}>
@@ -167,7 +180,7 @@ export function WelcomingRitualStep3({ userName, practiceData, onComplete, onBac
                 <Circle size={14} style={{ color: theme.accentColor }} />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">Mala</div>
+                <div className="text-xs text-gray-600">Cycle</div>
                 <div className="text-sm" style={{ color: theme.accentColor }}>{cycleCount}</div>
               </div>
             </div>
@@ -182,6 +195,21 @@ export function WelcomingRitualStep3({ userName, practiceData, onComplete, onBac
               <div className="text-left">
                 <div className="text-xs text-gray-600">Daily</div>
                 <div className="text-sm" style={{ color: theme.accentColor }}>{dailyGoal}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-white/25 backdrop-blur-sm rounded-xl">
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${theme.accentColor}20` }}
+            >
+              <Clock size={14} style={{ color: theme.accentColor }} />
+            </div>
+            <div className="text-left flex-1">
+              <div className="text-xs text-gray-600">Reminder</div>
+              <div className="text-sm" style={{ color: theme.accentColor }}>
+                {reminderEnabled ? `Daily at ${formatReminderTime(reminderTime)}` : 'Reminders off'}
               </div>
             </div>
           </div>
@@ -260,9 +288,6 @@ export function WelcomingRitualStep3({ userName, practiceData, onComplete, onBac
             transition={{ delay: 1.4 }}
             className="text-center"
           >
-            <p className="text-xs text-gray-500">
-              A gentle chime will welcome you to your practice
-            </p>
           </motion.div>
         </div>
       </div>

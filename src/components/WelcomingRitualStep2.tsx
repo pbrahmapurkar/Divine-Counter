@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { ChevronRight, ChevronLeft } from "lucide-react";
+// import { Switch } from "./ui/switch";
 
 interface Theme {
   id: string;
@@ -20,6 +21,8 @@ interface PracticeData {
   name: string;
   theme: Theme;
   dailyGoal: number;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
 
 interface WelcomingRitualStep2Props {
@@ -49,6 +52,8 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
   const [customCycle, setCustomCycle] = useState("");
   const [practiceName, setPracticeName] = useState("");
   const [dailyGoal, setDailyGoal] = useState(3);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState("09:00");
   
   // Always use Golden Sunrise theme
   const selectedTheme = goldenSunriseTheme;
@@ -60,7 +65,9 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
       cycleCount: finalCycleCount,
       name: practiceName || "My Practice",
       theme: goldenSunriseTheme,
-      dailyGoal
+      dailyGoal,
+      reminderEnabled,
+      reminderTime
     });
   };
 
@@ -69,6 +76,7 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
   };
 
   const isValid = (practiceName.trim().length > 0) && dailyGoal > 0;
+
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${selectedTheme.preview.bg} flex flex-col px-6 py-8 transition-all duration-1000`}>
@@ -95,7 +103,7 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           <h3 className="text-lg mb-4" style={{ color: selectedTheme.accentColor }}>
-            Mala Count
+            Cycle Count
           </h3>
           
           {/* Cycle Buttons */}
@@ -187,7 +195,7 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
           </h3>
           <input
             type="text"
-            placeholder="e.g., Morning Japa, Peace Meditation"
+            placeholder="e.g., Morning Practice, Peace Meditation"
             value={practiceName}
             onChange={(e) => setPracticeName(e.target.value)}
             className="w-full p-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl outline-none transition-all duration-300 focus:shadow-lg"
@@ -220,7 +228,7 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
                 {dailyGoal}
               </div>
               <div className="text-xs text-gray-500">
-                malas per day
+                cycles per day
               </div>
             </div>
             <button
@@ -232,6 +240,53 @@ export function WelcomingRitualStep2({ userName, onNext, onBack }: WelcomingRitu
             </button>
           </div>
         </motion.div>
+
+        {/* Reminder */}
+        {/*
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg mb-1" style={{ color: selectedTheme.accentColor }}>
+                Daily Reminder
+              </h3>
+              <p className="text-xs text-gray-500">Invite consistency with a gentle nudge.</p>
+            </div>
+            <Switch
+              checked={reminderEnabled}
+              onCheckedChange={setReminderEnabled}
+              aria-label="Toggle daily reminder"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!reminderEnabled) return;
+              openTimePicker();
+            }}
+            disabled={!reminderEnabled}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 ${
+              reminderEnabled
+                ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm'
+                : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-sm font-medium">Remind me at</span>
+            <span className="text-sm font-semibold">{formatReminderTime(reminderTime)}</span>
+          </button>
+          <input
+            ref={timeInputRef}
+            type="time"
+            value={reminderTime}
+            onChange={(event) => setReminderTime(event.target.value || "09:00")}
+            className="hidden"
+          />
+        </motion.div>
+        */}
 
 
       </div>

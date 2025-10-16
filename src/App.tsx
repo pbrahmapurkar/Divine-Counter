@@ -1,8 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
+import { LocalNotifications } from "@capacitor/local-notifications";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { HomeScreen } from "./components/HomeScreen";
 import { CountersScreen } from "./components/CountersScreen";
 import { PracticeJournalScreen } from "./components/PracticeJournalScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
+import {
+  AboutPage,
+  PrivacyPolicyPage,
+  TermsOfServicePage
+} from "./components/info";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { BootScreen } from "./components/BootScreen";
 import { WelcomingRitualStep1 } from "./components/WelcomingRitualStep1";
@@ -11,120 +20,308 @@ import { WelcomingRitualStep3 } from "./components/WelcomingRitualStep3";
 import { AddCounterModal } from "./components/AddCounterModal";
 import { EditPracticeScreen } from "./components/EditPracticeScreen";
 import { AddPracticeScreen } from "./components/AddPracticeScreen";
-import { PracticeProvider } from "./contexts/PracticeContext";
-import { HapticsService } from "./utils/haptics";
-import { VolumeButtons } from "@capacitor-community/volume-buttons";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { REWARDS, STREAK_MILESTONES, getRewardsByStreak, Reward, StreakMilestone } from "./data/rewards";
+import { RewardUnlockModal } from "./components/RewardUnlockModal";
+import { calculateAndUpdateStreak } from "./utils/streaks";
 
+// --- Helper Functions ---
+const MAX_HISTORY_ENTRIES = 365;
+
+const hydrateMilestones = (savedMilestones?: StreakMilestone[]): StreakMilestone[] => {
+  return STREAK_MILESTONES.map(base => {
+    const saved = savedMilestones?.find(m => m.days === base.days);
+    return {
+      ...base,
+      isAchieved: saved?.isAchieved ?? false,
+      achievedAt: saved?.achievedAt,
+    };
+  });
+};
+
+const parseReminderTime = (time: string): { hour: number; minute: number } | null => {
+  if (!time || typeof time !== "string") return null;
+  const [hourStr, minuteStr] = time.split(":");
+  if (hourStr === undefined || minuteStr === undefined) return null;
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return {
+    hour: Math.max(0, Math.min(23, hour)),
+    minute: Math.max(0, Math.min(59, minute)),
+  };
+};
+
+const computeNotificationId = (counterId: string): number => {
+  // Always use hash-based approach to ensure we stay within 32-bit integer limits
+  // This prevents issues with IDs that were created using Date.now()
+  let hash = 0;
+  for (let i = 0; i < counterId.length; i += 1) {
+    hash = (hash * 31 + counterId.charCodeAt(i)) % 2147483647;
+  }
+  // Ensure we return a positive integer between 1 and 2147483647 (max Java int)
+  return Math.abs(hash) || 1;
+};
+
+const generateUniqueIntId = (): number => {
+  const maxInt = 2147483647;
+  return Math.floor(Math.random() * maxInt);
+};
+
+const hydrateCounter = (raw: Partial<Counter> & { id: string | number }): Counter => {
+  const reminderEnabled = Boolean(raw.reminderEnabled);
+  const reminderTime = raw.reminderTime && /^\d{2}:\d{2}$/.test(raw.reminderTime)
+    ? raw.reminderTime
+    : "09:00";
+
+  return {
+    id: String(raw.id ?? generateUniqueIntId()),
+    name: raw.name || "Practice",
+    color: raw.color || "#D4AF37",
+    cycleCount: raw.cycleCount ?? 108,
+    dailyGoal: raw.dailyGoal ?? 3,
+    icon: raw.icon || "lotus",
+    reminderEnabled,
+    reminderTime,
+  };
+};
+
+// --- Interfaces ---
 interface Counter {
   id: string;
   name: string;
   color: string;
   cycleCount: number;
   dailyGoal: number;
+  icon?: string;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
-
 interface CounterState {
   [counterId: string]: {
-    currentCount: number;
-    todayProgress: number;
-    lastCountDate: string;
+  currentCount: number;
+  todayProgress: number;
+  lastCountDate: string;
   };
 }
-
 interface HistoryEntry {
   date: string;
   count: number;
   goalAchieved: boolean;
+  practiceId: string;
 }
-
 interface JournalEntry {
   date: string;
   reflection: string;
 }
-
 interface Settings {
-  hapticFeedback: boolean;
+  hapticsEnabled: boolean;
   volumeKeyControl: boolean;
 }
-
 type OnboardingStep = "greeting" | "practice" | "affirmation";
-type AppScreen = "home" | "history" | "counters" | "settings" | "edit-practice" | "add-practice";
+type AppScreen =
+  | "home"
+  | "history"
+  | "counters"
+  | "settings"
+  | "edit-practice"
+  | "add-practice"
+  | "about"
+  | "privacy"
+  | "terms";
 
+// --- Main App Component ---
 export default function App() {
-  // Core state
   const [isBooting, setIsBooting] = useState(true);
   const [isOnboarding, setIsOnboarding] = useState(true);
-  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>("greeting");
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>("home");
+  const [onboardingStep, setOnboardingStep] = useState("greeting" as OnboardingStep);
+  const [currentScreen, setCurrentScreen] = useState("home" as AppScreen);
   const [isNotificationPending, setIsNotificationPending] = useState(false);
-  
-  // Counter management
-  const [counters, setCounters] = useState<Counter[]>([]);
-  const [activeCounterId, setActiveCounterId] = useState<string>("");
-  const [counterStates, setCounterStates] = useState<CounterState>({});
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [counters, setCounters] = useState([] as Counter[]);
+  const [activeCounterId, setActiveCounterId] = useState("");
+  const [counterStates, setCounterStates] = useState({} as CounterState);
+  const [history, setHistory] = useState([] as HistoryEntry[]);
+  const [journalEntries, setJournalEntries] = useState([] as JournalEntry[]);
   const [streak, setStreak] = useState(0);
-  
-  // Settings
-  const [settings, setSettings] = useState<Settings>({
-    hapticFeedback: true,
-    volumeKeyControl: false
-  });
-  
-  // UI state
+  const [settings, setSettings] = useState({
+    hapticsEnabled: true,
+    volumeKeyControl: true
+  } as Settings);
   const [isAddCounterModalOpen, setIsAddCounterModalOpen] = useState(false);
-  const [editingCounterId, setEditingCounterId] = useState<string>("");
-  const [onboardingData, setOnboardingData] = useState<{
-    userName: string;
-    practiceData?: {
-      cycleCount: number;
-      name: string;
-      theme: any;
-      dailyGoal: number;
-    };
-  }>({ userName: "" });
-  
-  // Store userName separately for easy access
+  const [editingCounterId, setEditingCounterId] = useState("");
+  const [onboardingData, setOnboardingData] = useState({ userName: "" } as { userName: string; practiceData?: any; });
   const [userName, setUserName] = useState("");
+  
+  // Reward System State
+  const [rewards, setRewards] = useState(REWARDS.map(reward => ({ ...reward, isUnlocked: false })) as Reward[]);
+  const [milestones, setMilestones] = useState(() => hydrateMilestones());
+  const [unlockedRewards, setUnlockedRewards] = useState([] as string[]);
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [newRewards, setNewRewards] = useState([] as Reward[]);
+  const [newReward, setNewReward] = useState(null as Reward | null);
+  const [pendingRewards, setPendingRewards] = useState([] as Reward[]);
+  const [longestStreak, setLongestStreak] = useState(0);
+  const notificationPermissionRequestedRef = useRef(false);
+  const hasSyncedRemindersRef = useRef(false);
 
-  // Refs for volume control to avoid stale closures
-  const handleIncrementRef = useRef<() => void>();
-  const handleDecrementRef = useRef<() => void>();
+  const ensureNotificationPermissions = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) {
+      return true;
+    }
 
-  // Initialize app on first load
+    try {
+      const permissionStatus = await LocalNotifications.checkPermissions();
+      if (permissionStatus.display === 'granted') {
+        return true;
+      }
+
+      if (!notificationPermissionRequestedRef.current) {
+        notificationPermissionRequestedRef.current = true;
+        const requestStatus = await LocalNotifications.requestPermissions();
+        if (requestStatus.display === 'granted') {
+          return true;
+        }
+      }
+
+      toast.error("Notifications are disabled. Enable them in settings to receive reminders.");
+    } catch (error) {
+      console.error("Failed to request notification permissions", error);
+    }
+
+    return false;
+  }, []);
+
+  const cancelReminderForCounter = useCallback(async (counterId: string) => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    try {
+      const id = computeNotificationId(counterId);
+    await LocalNotifications.cancel({ notifications: [{ id }] });
+    } catch (error) {
+      console.error("Failed to cancel reminder", error);
+    }
+  }, []);
+
+  const scheduleReminderForCounter = useCallback(async (counter: Counter) => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    const notificationId = computeNotificationId(counter.id);
+
+    try {
+      await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+    } catch (error) {
+      console.error("Failed to cancel existing reminder", error);
+    }
+
+    if (!counter.reminderEnabled) {
+      return;
+    }
+
+    const permissionGranted = await ensureNotificationPermissions();
+    if (!permissionGranted) {
+      return;
+    }
+
+    const time = parseReminderTime(counter.reminderTime);
+    if (!time) {
+      console.warn("Invalid reminder time, skipping schedule", counter.reminderTime);
+      return;
+    }
+
+    try {
+      const notificationId = computeNotificationId(counter.id);
+      console.log('--- DEBUGGING NOTIFICATION ---');
+      console.log('Scheduling for practice:', counter.name);
+      console.log('Original Practice ID from state:', counter.id, '(type: ' + typeof counter.id + ')');
+      console.log('Safe notification ID generated:', notificationId, '(type: ' + typeof notificationId + ')');
+      console.log('------------------------------');
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: notificationId,
+            title: `Time for your ${counter.name} practice`,
+            body: "A moment for your daily ritual. Let's begin. 🙏",
+            schedule: {
+              repeats: true,
+              every: 'day',
+              on: { hour: time.hour, minute: time.minute },
+              allowWhileIdle: true,
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("Failed to schedule reminder", error);
+    }
+  }, [ensureNotificationPermissions]);
+
   useEffect(() => {
-    // Only check saved data after boot screen completes
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+    if (isBooting || isOnboarding) {
+      return;
+    }
+    if (hasSyncedRemindersRef.current) {
+      return;
+    }
+
+    hasSyncedRemindersRef.current = true;
+
+    counters.forEach(counter => {
+      if (counter.reminderEnabled) {
+        scheduleReminderForCounter(counter);
+      } else {
+        cancelReminderForCounter(counter.id);
+      }
+    });
+  }, [isBooting, isOnboarding, counters, scheduleReminderForCounter, cancelReminderForCounter]);
+
+  // Load data from localStorage on initial load
+  useEffect(() => {
     if (!isBooting) {
       const savedOnboarding = localStorage.getItem("divine-counter-onboarded");
-      const savedCounters = localStorage.getItem("divine-counter-counters");
-      const savedStates = localStorage.getItem("divine-counter-states");
-      const savedHistory = localStorage.getItem("divine-counter-history");
-      const savedJournalEntries = localStorage.getItem("divine-counter-journal");
-      const savedSettings = localStorage.getItem("divine-counter-settings");
-      const savedActiveCounter = localStorage.getItem("divine-counter-active");
-
-      if (savedOnboarding && savedCounters) {
+      if (savedOnboarding) {
         setIsOnboarding(false);
-        setCounters(JSON.parse(savedCounters));
-        
-        if (savedStates) setCounterStates(JSON.parse(savedStates));
-        if (savedHistory) setHistory(JSON.parse(savedHistory));
-        if (savedJournalEntries) setJournalEntries(JSON.parse(savedJournalEntries));
-        if (savedSettings) setSettings(JSON.parse(savedSettings));
-        if (savedActiveCounter) setActiveCounterId(savedActiveCounter);
-        
-        // Load stored userName
-        const savedUserName = localStorage.getItem("divine-counter-username");
-        if (savedUserName) setUserName(savedUserName);
+        const savedActiveCounterId = localStorage.getItem("divine-counter-active") || "";
+        const storedCounters = JSON.parse(localStorage.getItem("divine-counter-counters") || '[]');
+        const hydratedCounters = storedCounters.map((counter: Counter) => hydrateCounter(counter));
+        setCounters(hydratedCounters);
+        setCounterStates(JSON.parse(localStorage.getItem("divine-counter-states") || '{}'));
+        const rawHistory = JSON.parse(localStorage.getItem("divine-counter-history") || '[]');
+        const legacyFallbackId =
+          hydratedCounters.length === 1
+            ? hydratedCounters[0].id
+            : savedActiveCounterId || 'legacy';
+        const normalizedHistory = Array.isArray(rawHistory)
+          ? rawHistory.map((entry: any) => ({
+              ...entry,
+              practiceId: typeof entry.practiceId === 'string' && entry.practiceId.length > 0
+                ? entry.practiceId
+                : legacyFallbackId,
+            }))
+          : [];
+        setHistory(normalizedHistory);
+        setJournalEntries(JSON.parse(localStorage.getItem("divine-counter-journal") || '[]'));
+        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true,"volumeKeyControl":true}'));
+        setActiveCounterId(savedActiveCounterId);
+        setUserName(localStorage.getItem("divine-counter-username") || "");
+        setUnlockedRewards(JSON.parse(localStorage.getItem("divine-counter-unlocked-rewards") || '[]'));
+        setLongestStreak(parseInt(localStorage.getItem("divine-counter-longest-streak") || '0'));
+        const savedMilestones = localStorage.getItem("divine-counter-milestones");
+        setMilestones(hydrateMilestones(savedMilestones ? JSON.parse(savedMilestones) : undefined));
+        setRewards(JSON.parse(localStorage.getItem("divine-counter-rewards") || JSON.stringify(REWARDS.map(reward => ({ ...reward, isUnlocked: false })))));
       }
     }
   }, [isBooting]);
 
-
-  // Save data to localStorage
-  const saveData = () => {
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    if (!isOnboarding && !isBooting) {
     localStorage.setItem("divine-counter-onboarded", "true");
     localStorage.setItem("divine-counter-counters", JSON.stringify(counters));
     localStorage.setItem("divine-counter-states", JSON.stringify(counterStates));
@@ -133,358 +330,445 @@ export default function App() {
     localStorage.setItem("divine-counter-settings", JSON.stringify(settings));
     localStorage.setItem("divine-counter-active", activeCounterId);
     localStorage.setItem("divine-counter-username", userName);
-  };
-
-  useEffect(() => {
-    if (!isOnboarding) {
-      saveData();
+    localStorage.setItem("divine-counter-unlocked-rewards", JSON.stringify(unlockedRewards));
+    localStorage.setItem("divine-counter-longest-streak", longestStreak.toString());
+    localStorage.setItem("divine-counter-milestones", JSON.stringify(milestones));
+    localStorage.setItem("divine-counter-rewards", JSON.stringify(rewards));
     }
-  }, [counters, counterStates, history, journalEntries, settings, activeCounterId, userName, isOnboarding]);
+  }, [counters, counterStates, history, journalEntries, settings, activeCounterId, userName, isOnboarding, isBooting, milestones, rewards, unlockedRewards, longestStreak]);
 
-  // Calculate streak
   useEffect(() => {
-    if (history.length === 0) {
-      setStreak(0);
+    if (!Capacitor.isNativePlatform()) {
       return;
     }
 
-    let currentStreak = 0;
-    const today = new Date().toDateString();
-    const sortedHistory = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    for (const entry of sortedHistory) {
-      if (entry.goalAchieved) {
-        currentStreak++;
-      } else {
-        break;
+    const mainScreens: AppScreen[] = ["home", "history", "counters", "settings"];
+
+    const backHandler = CapacitorApp.addListener("backButton", () => {
+      if (isOnboarding) {
+        if (onboardingStep === "affirmation") {
+          setOnboardingStep("practice");
+          return;
+        }
+
+        if (onboardingStep === "practice") {
+          setOnboardingStep("greeting");
+          return;
+        }
+
+        CapacitorApp.exitApp();
+        return;
       }
-    }
-    
-    setStreak(currentStreak);
-  }, [history]);
 
-  // Onboarding handlers
-  const handleGreetingNext = (userName: string) => {
-    setOnboardingData(prev => ({ ...prev, userName }));
-    setOnboardingStep("practice");
-  };
+      if (showRewardModal) {
+        setShowRewardModal(false);
+        return;
+      }
 
-  const handlePracticeNext = (practiceData: any) => {
-    setOnboardingData(prev => ({ ...prev, practiceData }));
-    setOnboardingStep("affirmation");
-  };
+      if (isAddCounterModalOpen) {
+        setIsAddCounterModalOpen(false);
+        return;
+      }
 
-  const handleOnboardingComplete = () => {
-    if (!onboardingData.practiceData) return;
-    
-    const { practiceData } = onboardingData;
-    
-    // Store userName
-    setUserName(onboardingData.userName);
-    
-    // Create the first counter
-    const counter: Counter = {
-      id: Date.now().toString(),
-      name: practiceData.name,
-      color: practiceData.theme.accentColor,
-      cycleCount: practiceData.cycleCount,
-      dailyGoal: practiceData.dailyGoal
-    };
+      if (currentScreen === "add-practice" || currentScreen === "edit-practice") {
+        setCurrentScreen("counters");
+        return;
+      }
 
-    setCounters([counter]);
-    setActiveCounterId(counter.id);
-    setCounterStates({
-      [counter.id]: {
-        currentCount: 0,
-        todayProgress: 0,
-        lastCountDate: new Date().toDateString()
+      if (mainScreens.includes(currentScreen)) {
+        CapacitorApp.exitApp();
+        return;
       }
     });
-    
+
+    return () => {
+      backHandler.remove();
+    };
+  }, [currentScreen, isAddCounterModalOpen, isOnboarding, onboardingStep, showRewardModal]);
+
+  // Detect day change based on local time and roll over progress/history
+  useEffect(() => {
+    if (isBooting || isOnboarding || !activeCounterId) {
+      return;
+    }
+
+    const currentState = counterStates[activeCounterId];
+    if (!currentState) {
+      return;
+    }
+
+    const todayString = new Date().toDateString();
+    if (currentState.lastCountDate === todayString) {
+      return;
+    }
+
+    const counter = counters.find(c => c.id === activeCounterId);
+    if (!counter) {
+      return;
+    }
+
+    if (currentState.todayProgress > 0) {
+      const newEntry: HistoryEntry = {
+        date: currentState.lastCountDate,
+        count: currentState.todayProgress,
+        goalAchieved: currentState.todayProgress >= counter.dailyGoal,
+        practiceId: counter.id,
+      };
+
+      setHistory(prev => {
+        const deduped = prev.filter(
+          entry => !(entry.date === newEntry.date && entry.practiceId === newEntry.practiceId)
+        );
+        const updated = [newEntry, ...deduped];
+        return updated.slice(0, MAX_HISTORY_ENTRIES);
+      });
+    }
+
+    setCounterStates(prev => {
+      const existing = prev[activeCounterId];
+      if (!existing) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [activeCounterId]: {
+          ...existing,
+          todayProgress: 0,
+          lastCountDate: todayString,
+        },
+      };
+    });
+  }, [isBooting, isOnboarding, activeCounterId, counterStates, counters]);
+
+  // Reward system - queue new rewards when streak reaches unlock thresholds
+  useEffect(() => {
+    if (streak <= 0 || pendingRewards.length > 0) {
+      return;
+    }
+
+    const rewardsForStreak = getRewardsByStreak(streak, rewards);
+    const lockedRewards = rewardsForStreak.filter(reward => !reward.isUnlocked);
+
+    if (lockedRewards.length === 0) {
+      return;
+    }
+
+    setPendingRewards(lockedRewards);
+    setNewReward(lockedRewards[0]);
+  }, [streak, rewards, pendingRewards]);
+
+  // Reward system - unlock queued rewards and trigger celebration UI
+  useEffect(() => {
+    if (!pendingRewards.length || !newReward) {
+      return;
+    }
+
+    const unlockTimestamp = new Date().toISOString();
+
+    setRewards(prev => prev.map(reward =>
+      pendingRewards.some(pending => pending.id === reward.id)
+        ? { ...reward, isUnlocked: true, unlockedAt: unlockTimestamp }
+        : reward
+    ));
+
+    setUnlockedRewards(prev => {
+      const idsToAdd = pendingRewards.map(reward => reward.id);
+      const merged = new Set([...prev, ...idsToAdd]);
+      return Array.from(merged);
+    });
+
+    setNewRewards(pendingRewards.map(reward => ({
+      ...reward,
+      isUnlocked: true,
+      unlockedAt: unlockTimestamp
+    })));
+
+    setShowRewardModal(true);
+
+    toast.success(`🎉 New Reward Unlocked: ${newReward.name}!`, {
+      duration: 4000,
+    });
+
+    setPendingRewards([]);
+  }, [pendingRewards, newReward]);
+
+  // Streak calculation & milestone persistence
+  useEffect(() => {
+    if (isOnboarding) {
+      return;
+    }
+
+    setMilestones((previousMilestones) => {
+      const { currentStreak: calculatedStreak, milestones: updatedMilestones } = calculateAndUpdateStreak(
+        history,
+        previousMilestones
+      );
+
+      setStreak(calculatedStreak);
+      setLongestStreak((prev) => Math.max(prev, calculatedStreak));
+
+      updatedMilestones.forEach((milestone, index) => {
+        const wasAchieved = previousMilestones[index]?.isAchieved;
+        if (!wasAchieved && milestone.isAchieved) {
+          toast.success(`🎉 Milestone Achieved! ${milestone.days}-day streak unlocked.`);
+        }
+      });
+
+      if (updatedMilestones === previousMilestones) {
+        return previousMilestones;
+      }
+
+      return updatedMilestones;
+    });
+  }, [history, isOnboarding]);
+
+  // Onboarding handlers (No Changes)
+  const handleGreetingNext = (name: string) => {
+    setOnboardingData({ userName: name });
+    setOnboardingStep("practice");
+  };
+  const handlePracticeNext = (data: any) => {
+    setOnboardingData(prev => ({ ...prev, practiceData: data }));
+    setOnboardingStep("affirmation");
+  };
+  const handleOnboardingComplete = async () => {
+    if (!onboardingData.practiceData) return;
+    setUserName(onboardingData.userName);
+    const counterId = generateUniqueIntId();
+    const counter: Counter = {
+      id: String(counterId),
+      name: onboardingData.practiceData.name,
+      color: onboardingData.practiceData.theme.accentColor,
+      cycleCount: onboardingData.practiceData.cycleCount,
+      dailyGoal: onboardingData.practiceData.dailyGoal,
+      icon: 'lotus',
+      reminderEnabled: onboardingData.practiceData.reminderEnabled ?? false,
+      reminderTime: onboardingData.practiceData.reminderTime || "09:00",
+    };
+    setCounters([counter]);
+    setActiveCounterId(counter.id);
+    setCounterStates({ [counter.id]: { currentCount: 0, todayProgress: 0, lastCountDate: new Date().toDateString() } });
+    setCurrentScreen("home");
+    setOnboardingStep("greeting");
     setIsOnboarding(false);
-    toast.success(`Welcome to your sacred practice, ${onboardingData.userName}! 🙏`);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+    toast.success(`Welcome, ${onboardingData.userName}! 🙏`);
+
+    if (counter.reminderEnabled) {
+      await scheduleReminderForCounter(counter);
+    }
   };
 
-  // Counter actions
-  const handleIncrement = () => {
+  // Counter Actions - CORRECTED HAPTIC LOGIC
+  const handleIncrement = useCallback(() => {
     if (!activeCounterId) return;
-    
     const counter = counters.find(c => c.id === activeCounterId);
     if (!counter) return;
 
-    // Trigger haptic feedback on every tap if enabled
-    if (settings.hapticFeedback) {
-      HapticsService.tap();
+    if (settings.hapticsEnabled && Capacitor.isNativePlatform()) {
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
     }
 
     const today = new Date().toDateString();
-    const currentState = counterStates[activeCounterId] || {
-      currentCount: 0,
-      todayProgress: 0,
-      lastCountDate: today
-    };
-
+    const currentState = counterStates[activeCounterId] || { currentCount: 0, todayProgress: 0, lastCountDate: today };
     let newCount = currentState.currentCount + 1;
     let newTodayProgress = currentState.todayProgress;
 
-    // Reset count if it reaches cycle limit
+    // Check if cycle is completed
     if (newCount >= counter.cycleCount && !isNotificationPending) {
+      // Cycle completed - reset count and increment today's progress
       newCount = 0;
       newTodayProgress++;
-      
-      // Set notification flag to prevent duplicates
       setIsNotificationPending(true);
       
-      // Show completion feedback
-      toast.success("Mala complete! 🎉");
+      // Haptic feedback for cycle completion
+      if (settings.hapticsEnabled && Capacitor.isNativePlatform()) {
+        Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+        Haptics.notification({ type: NotificationType.Success }).catch(() => {});
+      }
       
-      // Always trigger celebratory haptic feedback on mala completion
-      HapticsService.completion();
-      
-      // Reset notification flag after a short delay
-      setTimeout(() => {
-        setIsNotificationPending(false);
-      }, 1000);
+      toast.success("Cycle complete! 🎉");
+      setTimeout(() => setIsNotificationPending(false), 1000);
     }
 
-    // Reset daily progress if new day
+    // Handle day change
     if (currentState.lastCountDate !== today) {
-      newTodayProgress = newCount >= counter.cycleCount ? 1 : 0;
-      
-      // Update history for previous day
+      // Save previous day's progress to history
       if (currentState.todayProgress > 0) {
         const newEntry: HistoryEntry = {
           date: currentState.lastCountDate,
           count: currentState.todayProgress,
-          goalAchieved: currentState.todayProgress >= counter.dailyGoal
+          goalAchieved: currentState.todayProgress >= counter.dailyGoal,
+          practiceId: counter.id
         };
-        setHistory(prev => [newEntry, ...prev.slice(0, 29)]); // Keep last 30 days
+        setHistory(prev => {
+          const deduped = prev.filter(
+            entry => !(entry.date === newEntry.date && entry.practiceId === newEntry.practiceId)
+          );
+          const updated = [newEntry, ...deduped];
+          return updated.slice(0, MAX_HISTORY_ENTRIES);
+        });
       }
     }
 
-    setCounterStates(prev => ({
-      ...prev,
-      [activeCounterId]: {
-        currentCount: newCount,
-        todayProgress: newTodayProgress,
-        lastCountDate: today
-      }
-    }));
-  };
+    setCounterStates(prev => ({ ...prev, [activeCounterId]: { currentCount: newCount, todayProgress: newTodayProgress, lastCountDate: today } }));
+  }, [activeCounterId, counters, settings.hapticsEnabled, counterStates, isNotificationPending]);
 
-  const handleDecrement = () => {
+  const handleDecrement = useCallback(() => {
     if (!activeCounterId) return;
-    
     const currentState = counterStates[activeCounterId];
     if (!currentState || currentState.currentCount <= 0) return;
 
-    // Trigger haptic feedback for undo action if enabled
-    if (settings.hapticFeedback) {
-      HapticsService.action();
+    if (settings.hapticsEnabled && Capacitor.isNativePlatform()) {
+      Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
     }
 
-    setCounterStates(prev => ({
-      ...prev,
-      [activeCounterId]: {
-        ...currentState,
-        currentCount: currentState.currentCount - 1
-      }
-    }));
-  };
+    setCounterStates(prev => ({ ...prev, [activeCounterId]: { ...currentState, currentCount: currentState.currentCount - 1 } }));
+  }, [activeCounterId, counterStates, settings.hapticsEnabled]);
 
-  const resetCurrentCount = () => {
+  const resetCurrentCount = useCallback(() => {
     if (!activeCounterId) return;
-    
     const currentState = counterStates[activeCounterId];
     if (!currentState) return;
 
-    // Trigger haptic feedback for reset action if enabled
-    if (settings.hapticFeedback) {
-      HapticsService.action();
+    if (settings.hapticsEnabled) {
+      Haptics.selectionStart();
     }
 
+    setCounterStates(prev => ({ ...prev, [activeCounterId]: { ...currentState, currentCount: 0 } }));
+  }, [activeCounterId, counterStates, settings.hapticsEnabled]);
+
+  // Other handlers (No Changes)
+  const handleCycleComplete = () => { /* Handled in increment */ };
+  const handleSelectCounter = (id: string) => { setActiveCounterId(id); setCurrentScreen("home"); };
+  const handleAddCounter = useCallback(async (data: Omit<Counter, "id">) => {
+    const id = generateUniqueIntId();
+    const newCounter = hydrateCounter({ ...data, id });
+
+    setCounters(prev => [...prev, newCounter]);
     setCounterStates(prev => ({
       ...prev,
-      [activeCounterId]: {
-        ...currentState,
-        currentCount: 0
-        // Note: todayProgress and lastCountDate remain unchanged
-      }
-    }));
-  };
-
-  // Update refs to avoid stale closures
-  useEffect(() => {
-    handleIncrementRef.current = handleIncrement;
-    handleDecrementRef.current = handleDecrement;
-  }, [handleIncrement, handleDecrement]);
-
-  // Volume key control
-  useEffect(() => {
-    if (!settings.volumeKeyControl) {
-      console.log('Volume key control is disabled');
-      return;
-    }
-
-    let listener: any = null;
-
-    const setupVolumeControl = async () => {
-      try {
-        console.log('Setting up volume key control...');
-        await VolumeButtons.startListening();
-        
-        listener = await VolumeButtons.addListener('volumeButtonPressed', (event) => {
-          console.log('Volume button pressed:', event);
-          
-          if (event.direction === 'up' && handleIncrementRef.current) {
-            console.log('Volume UP pressed - incrementing count');
-            handleIncrementRef.current();
-          } else if (event.direction === 'down' && handleDecrementRef.current) {
-            console.log('Volume DOWN pressed - decrementing count');
-            handleDecrementRef.current();
-          }
-        });
-        
-        console.log('Volume key control activated successfully');
-        toast.success('Volume key control enabled');
-      } catch (error) {
-        console.error('Volume key control setup failed:', error);
-        toast.error('Volume key control not available on this device');
-      }
-    };
-
-    setupVolumeControl();
-
-    // Cleanup function
-    return () => {
-      if (listener) {
-        try {
-          VolumeButtons.removeAllListeners();
-          VolumeButtons.stopListening();
-          console.log('Volume key control deactivated');
-        } catch (error) {
-          console.warn('Error during volume control cleanup:', error);
-        }
-      }
-    };
-  }, [settings.volumeKeyControl, activeCounterId]);
-
-  const handleCycleComplete = () => {
-    // This is handled in handleIncrement
-  };
-
-  // Counter management
-  const handleSelectCounter = (counterId: string) => {
-    setActiveCounterId(counterId);
-    setCurrentScreen("home");
-  };
-
-  const handleAddCounter = (counterData: Omit<Counter, "id">) => {
-    const counter: Counter = {
-      ...counterData,
-      id: Date.now().toString()
-    };
-
-    setCounters(prev => [...prev, counter]);
-    setCounterStates(prev => ({
-      ...prev,
-      [counter.id]: {
+      [newCounter.id]: {
         currentCount: 0,
         todayProgress: 0,
-        lastCountDate: new Date().toDateString()
-      }
+        lastCountDate: new Date().toDateString(),
+      },
     }));
-    
-    toast.success(`${counter.name} counter added!`);
-  };
+    setActiveCounterId(newCounter.id);
 
-  const handleEditCounter = (counterId: string) => {
-    setEditingCounterId(counterId);
+    if (newCounter.reminderEnabled) {
+      await scheduleReminderForCounter(newCounter);
+    } else {
+      await cancelReminderForCounter(newCounter.id);
+    }
+
+    toast.success("Practice added");
+  }, [scheduleReminderForCounter, cancelReminderForCounter]);
+
+  const handleEditCounter = useCallback((id: string) => {
+    setEditingCounterId(id);
     setCurrentScreen("edit-practice");
-  };
+  }, []);
 
-  const handleUpdateCounter = (updatedCounter: Counter) => {
-    setCounters(prev => prev.map(counter => 
-      counter.id === updatedCounter.id ? updatedCounter : counter
-    ));
-    setCurrentScreen("counters");
-    setEditingCounterId("");
-    toast.success(`${updatedCounter.name} updated successfully!`);
-  };
+  const handleUpdateCounter = useCallback(async (updated: Counter) => {
+    const hydrated = hydrateCounter(updated);
 
-  const handleDeleteCounter = (counterId: string) => {
-    const counter = counters.find(c => c.id === counterId);
-    if (!counter) return;
+    setCounters(prev => prev.map(counter => (counter.id === hydrated.id ? hydrated : counter)));
 
-    // Trigger haptic feedback for delete action if enabled
-    if (settings.hapticFeedback) {
-      HapticsService.action();
+    if (hydrated.reminderEnabled) {
+      await scheduleReminderForCounter(hydrated);
+    } else {
+      await cancelReminderForCounter(hydrated.id);
     }
 
-    // Remove counter from list
-    setCounters(prev => prev.filter(c => c.id !== counterId));
-    
-    // Remove counter state
+    toast.success("Practice updated");
+  }, [scheduleReminderForCounter, cancelReminderForCounter]);
+
+  const handleDeleteCounter = useCallback(async (id: string) => {
+    const remainingCounters = counters.filter(counter => counter.id !== id);
+    setCounters(remainingCounters);
     setCounterStates(prev => {
-      const newStates = { ...prev };
-      delete newStates[counterId];
-      return newStates;
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
     });
-    
-    // Remove from history (filter out entries for this counter if needed)
-    // For now, we'll keep history as it might be useful for data migration
-    
-    // If deleted counter was active, switch to first available counter
-    if (activeCounterId === counterId) {
-      const remainingCounters = counters.filter(c => c.id !== counterId);
-      setActiveCounterId(remainingCounters.length > 0 ? remainingCounters[0].id : "");
+
+    if (activeCounterId === id) {
+      setActiveCounterId(remainingCounters[0]?.id || "");
     }
-    
-    toast.success(`${counter.name} deleted`);
-  };
 
-  const handleNavigateToOnboarding = () => {
-    setIsOnboarding(true);
-    setOnboardingStep("practice");
-    setOnboardingData(prev => ({ ...prev, userName }));
-  };
+    await cancelReminderForCounter(id);
+    toast.success("Practice deleted");
+  }, [cancelReminderForCounter, counters, activeCounterId]);
+  const handleSettingToggle = (setting: keyof Settings) => { setSettings(prev => ({ ...prev, [setting]: !prev[setting] })); };
+  const handleResetTutorial = useCallback(() => {
+    const storageKeys = [
+      "divine-counter-onboarded",
+      "divine-counter-counters",
+      "divine-counter-states",
+      "divine-counter-history",
+      "divine-counter-journal",
+      "divine-counter-settings",
+      "divine-counter-active",
+      "divine-counter-username",
+      "divine-counter-unlocked-rewards",
+      "divine-counter-longest-streak",
+      "divine-counter-milestones",
+      "divine-counter-rewards",
+    ];
 
-  // Settings handlers
-  const handleSettingToggle = (setting: keyof Settings) => {
-    setSettings(prev => ({ ...prev, [setting]: !prev[setting] }));
-  };
+    storageKeys.forEach((key) => localStorage.removeItem(key));
 
-  const handleResetTutorial = () => {
-    // Trigger haptic feedback for reset tutorial action if enabled
-    if (settings.hapticFeedback) {
-      HapticsService.action();
+    setIsNotificationPending(false);
+    setIsAddCounterModalOpen(false);
+    setShowRewardModal(false);
+    setPendingRewards([]);
+    setNewRewards([]);
+    setNewReward(null);
+
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.cancelAll().catch(error => console.error("Failed to cancel notifications during reset", error));
     }
+
+    setCounters([]);
+    setActiveCounterId("");
+    setCounterStates({});
+    setHistory([]);
+    setJournalEntries([]);
+    setUnlockedRewards([]);
+    setStreak(0);
+    setLongestStreak(0);
+    setRewards(REWARDS.map(reward => ({ ...reward, isUnlocked: false })));
+    setMilestones(hydrateMilestones());
+
+    setSettings({ hapticsEnabled: true, volumeKeyControl: true });
+    setUserName("");
+    setOnboardingData({ userName: "" });
+    setEditingCounterId("");
 
     setIsOnboarding(true);
     setOnboardingStep("greeting");
-    setOnboardingData({ userName: "" });
-    setUserName("");
+    setCurrentScreen("home");
+  }, []);
+  const handleAddJournalEntry = (entry: JournalEntry) => { /* ... */ };
+  
+  // Reward system handlers
+  const handleClaimReward = (rewardId: string) => {
+    setRewards(prev => prev.map(reward => 
+      reward.id === rewardId 
+        ? { ...reward, isUnlocked: true, unlockedAt: new Date().toISOString() }
+        : reward
+    ));
+    setUnlockedRewards(prev => [...prev, rewardId]);
+    toast.success("Reward claimed! 🎉");
   };
-
-  // Journal handlers
-  const handleAddJournalEntry = (entry: JournalEntry) => {
-    setJournalEntries(prev => {
-      const existing = prev.findIndex(e => e.date === entry.date);
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = entry;
-        return updated;
-      }
-      return [...prev, entry];
-    });
-    toast.success("Reflection saved 🙏");
-  };
-
-  // Get current counter and state
+  
   const activeCounter = counters.find(c => c.id === activeCounterId);
   const activeCounterState = activeCounterId ? counterStates[activeCounterId] : null;
 
-  // Show boot screen first
+  // Render Logic (No Changes)
   if (isBooting) {
     return <BootScreen onComplete={() => setIsBooting(false)} />;
   }
@@ -492,67 +776,44 @@ export default function App() {
   if (isOnboarding) {
     return (
       <div className="min-h-screen">
-        {onboardingStep === "greeting" && (
-          <WelcomingRitualStep1 onNext={handleGreetingNext} />
-        )}
-        {onboardingStep === "practice" && (
-          <WelcomingRitualStep2
-            userName={onboardingData.userName}
-            onNext={handlePracticeNext}
-            onBack={() => setOnboardingStep("greeting")}
-          />
-        )}
-        {onboardingStep === "affirmation" && onboardingData.practiceData && (
-          <WelcomingRitualStep3
-            userName={onboardingData.userName}
-            practiceData={onboardingData.practiceData}
-            onComplete={handleOnboardingComplete}
-            onBack={() => setOnboardingStep("practice")}
-          />
-        )}
+        {onboardingStep === "greeting" && <WelcomingRitualStep1 onNext={handleGreetingNext} />}
+        {onboardingStep === "practice" && <WelcomingRitualStep2 userName={onboardingData.userName} onNext={handlePracticeNext} onBack={() => setOnboardingStep("greeting")} />}
+        {onboardingStep === "affirmation" && onboardingData.practiceData && <WelcomingRitualStep3 userName={onboardingData.userName} practiceData={onboardingData.practiceData} onComplete={handleOnboardingComplete} onBack={() => setOnboardingStep("practice")} />}
       </div>
     );
   }
 
   return (
-    <div 
-        className="min-h-screen bg-background"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingLeft: 'env(safe-area-inset-left)',
-          paddingRight: 'env(safe-area-inset-right)',
-          paddingBottom: 'env(safe-area-inset-bottom)'
-        }}
-      >
-      {/* Main Content Area with proper spacing for bottom navigation */}
+    <div className="min-h-screen bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div className="pb-20">
-          {currentScreen === "home" && activeCounter && activeCounterState && (
-          <PracticeProvider onDecrement={handleDecrement}>
-            <HomeScreen
-              counter={activeCounter}
-              currentCount={activeCounterState.currentCount}
-              todayProgress={activeCounterState.todayProgress}
-              streak={streak}
-              userName={userName}
-              onIncrement={handleIncrement}
-              onDecrement={handleDecrement}
-              onCycleComplete={handleCycleComplete}
-              onResetCurrentCount={resetCurrentCount}
-            />
-          </PracticeProvider>
-          )}
-        
+        {currentScreen === "home" && activeCounter && activeCounterState && (
+          <HomeScreen
+            counter={activeCounter}
+            currentCount={activeCounterState.currentCount}
+            todayProgress={activeCounterState.todayProgress}
+            streak={streak}
+            userName={userName}
+            onIncrement={handleIncrement}
+            onDecrement={handleDecrement}
+            onResetCurrentCount={resetCurrentCount}
+            hapticsEnabled={settings.hapticsEnabled}
+          />
+        )}
         {currentScreen === "history" && activeCounter && activeCounterState && (
           <PracticeJournalScreen
+            counterName={activeCounter.name}
             todayProgress={activeCounterState.todayProgress}
             dailyGoal={activeCounter.dailyGoal}
             streak={streak}
+            longestStreak={longestStreak}
             history={history}
+            activePracticeId={activeCounter.id}
             journalEntries={journalEntries}
+            unlockedRewards={unlockedRewards}
+            milestones={milestones}
             onAddJournalEntry={handleAddJournalEntry}
           />
         )}
-        
         {currentScreen === "counters" && (
           <CountersScreen
             counters={counters}
@@ -565,25 +826,31 @@ export default function App() {
             onNavigateToAddPractice={() => setCurrentScreen("add-practice")}
           />
         )}
-        
         {currentScreen === "settings" && (
           <SettingsScreen
-            hapticFeedback={settings.hapticFeedback}
-            onHapticFeedbackToggle={() => handleSettingToggle("hapticFeedback")}
-            volumeKeyControl={settings.volumeKeyControl}
-            onVolumeKeyControlToggle={() => handleSettingToggle("volumeKeyControl")}
+            hapticsEnabled={settings.hapticsEnabled}
+            onHapticsToggle={() => handleSettingToggle("hapticsEnabled")}
             onResetTutorial={handleResetTutorial}
+            onOpenInfoPage={(key) => setCurrentScreen(key as AppScreen)}
           />
         )}
-
+        {currentScreen === "about" && (
+          <AboutPage onBack={() => setCurrentScreen("settings")} />
+        )}
+        {currentScreen === "privacy" && (
+          <PrivacyPolicyPage onBack={() => setCurrentScreen("settings")} />
+        )}
+        {currentScreen === "terms" && (
+          <TermsOfServicePage onBack={() => setCurrentScreen("settings")} />
+        )}
         {currentScreen === "edit-practice" && editingCounterId && (
           <EditPracticeScreen
             counter={counters.find(c => c.id === editingCounterId)!}
             onSave={handleUpdateCounter}
             onBack={() => setCurrentScreen("counters")}
+            rewards={rewards}
           />
         )}
-
         {currentScreen === "add-practice" && (
           <AddPracticeScreen
             onSave={handleAddCounter}
@@ -591,19 +858,24 @@ export default function App() {
           />
         )}
       </div>
-
-      {/* Bottom Navigation - Fixed at bottom */}
-      {currentScreen !== "edit-practice" && currentScreen !== "add-practice" && (
-        <BottomNavigation
-          activeScreen={currentScreen}
+      {!["edit-practice", "add-practice", "about", "privacy", "terms"].includes(currentScreen) && (
+      <BottomNavigation
+        activeScreen={currentScreen}
           onNavigate={(screen) => setCurrentScreen(screen as AppScreen)}
         />
       )}
-
       <AddCounterModal
         isOpen={isAddCounterModalOpen}
         onClose={() => setIsAddCounterModalOpen(false)}
         onAdd={handleAddCounter}
+      />
+      
+      {/* Reward Unlock Modal */}
+      <RewardUnlockModal
+        isOpen={showRewardModal}
+        onClose={() => setShowRewardModal(false)}
+        rewards={newRewards}
+        onClaim={handleClaimReward}
       />
     </div>
   );

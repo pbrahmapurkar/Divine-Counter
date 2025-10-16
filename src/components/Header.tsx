@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
-import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
+import { GoldenLogo } from './GoldenLogo';
+import { SafeAreaHeader } from './SafeAreaView';
 
 interface HeaderProps {
   title: string;
@@ -20,16 +21,14 @@ export function Header({
   className = ""
 }: HeaderProps) {
   return (
-    <div className={`fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-b border-gray-200/20 dark:border-gray-700/20 shadow-sm ${className}`}>
+    <SafeAreaHeader 
+      className={`bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-b border-gray-200/20 dark:border-gray-700/20 shadow-sm ${className}`}
+    >
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
           {/* App Logo */}
           <div className="flex items-center gap-2">
-            <img 
-              src={logo} 
-              alt="Divine Counter" 
-              className="w-8 h-8 rounded-lg shadow-sm"
-            />
+            <GoldenLogo size="md" animated={true} />
             {showBackButton && (
               <button
                 onClick={onBack}
@@ -52,6 +51,6 @@ export function Header({
           </div>
         )}
       </div>
-    </div>
+    </SafeAreaHeader>
   );
 }

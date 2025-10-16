@@ -128,10 +128,58 @@
     --color-gray-900: oklch(.21 .034 264.665);
     --color-black: #000;
     --color-white: #fff;
+    
+    /* Divine Design System - Sacred Color Palette */
+    /* Lotus Pink: Gentle, nurturing, represents compassion and inner peace */
+    --color-sacred-lotus-pink-300: oklch(.85 .15 340);
+    --color-sacred-lotus-pink-400: oklch(.78 .18 340);
+    --color-sacred-lotus-pink-500: oklch(.72 .20 340);
+    
+    /* Sky Blue: Calm, expansive, represents wisdom and clarity */
+    --color-sacred-sky-blue-300: oklch(.88 .12 220);
+    --color-sacred-sky-blue-400: oklch(.82 .15 220);
+    --color-sacred-sky-blue-500: oklch(.76 .18 220);
+    
+    /* Emerald Green: Growth, harmony, represents balance and renewal */
+    --color-sacred-emerald-green-300: oklch(.85 .15 150);
+    --color-sacred-emerald-green-400: oklch(.78 .18 150);
+    --color-sacred-emerald-green-500: oklch(.72 .20 150);
+    
+    /* Amethyst Purple: Spiritual, mystical, represents intuition and higher consciousness */
+    --color-sacred-amethyst-purple-300: oklch(.85 .15 280);
+    --color-sacred-amethyst-purple-400: oklch(.78 .18 280);
+    --color-sacred-amethyst-purple-500: oklch(.72 .20 280);
+    
     --spacing: .25rem;
     --container-sm: 24rem;
     --container-md: 28rem;
     --container-lg: 32rem;
+    /* Divine Design System - Sacred Typography Scale */
+    /* Whisper: Subtle text, captions, fine print - embodies gentle guidance */
+    --text-whisper: .75rem;
+    --text-whisper--line-height: 1.5;
+    --text-whisper--letter-spacing: -.01em;
+    
+    /* Body: Standard reading text - the foundation of spiritual communication */
+    --text-body: 1rem;
+    --text-body--line-height: 1.5;
+    
+    /* Mantra: Emphasized text, affirmations - carries spiritual weight */
+    --text-mantra: 1.25rem;
+    --text-mantra--line-height: 1.4;
+    --text-mantra--font-weight: 600;
+    
+    /* Devotion: Section headers, important messages - shows dedication */
+    --text-devotion: 1.5rem;
+    --text-devotion--line-height: 1.33;
+    --text-devotion--font-weight: 600;
+    
+    /* Heading: Main titles, spiritual milestones - commands reverence */
+    --text-heading: 2rem;
+    --text-heading--line-height: 1.25;
+    --text-heading--font-weight: 700;
+    
+    /* Legacy typography scale - kept for compatibility during transition */
     --text-xs: .75rem;
     --text-xs--line-height: calc(1 / .75);
     --text-sm: .875rem;
@@ -1056,6 +1104,19 @@
     animation: var(--animate-pulse);
   }
 
+  /* Divine Design System - Sacred Motion Utilities */
+  .animate-meditation-breath {
+    animation: meditation-breath 4s ease-in-out infinite;
+  }
+
+  .animate-quick-feedback {
+    animation: quick-feedback 200ms ease-out;
+  }
+
+  .animate-sacred-transition {
+    animation: sacred-transition 800ms ease-in-out;
+  }
+
   .cursor-not-allowed {
     cursor: not-allowed;
   }
@@ -1523,6 +1584,55 @@
     background-color: var(--primary);
   }
 
+  /* Divine Design System - Sacred Color Utilities */
+  .bg-sacred-lotus-pink-300 {
+    background-color: var(--color-sacred-lotus-pink-300);
+  }
+
+  .bg-sacred-lotus-pink-400 {
+    background-color: var(--color-sacred-lotus-pink-400);
+  }
+
+  .bg-sacred-lotus-pink-500 {
+    background-color: var(--color-sacred-lotus-pink-500);
+  }
+
+  .bg-sacred-sky-blue-300 {
+    background-color: var(--color-sacred-sky-blue-300);
+  }
+
+  .bg-sacred-sky-blue-400 {
+    background-color: var(--color-sacred-sky-blue-400);
+  }
+
+  .bg-sacred-sky-blue-500 {
+    background-color: var(--color-sacred-sky-blue-500);
+  }
+
+  .bg-sacred-emerald-green-300 {
+    background-color: var(--color-sacred-emerald-green-300);
+  }
+
+  .bg-sacred-emerald-green-400 {
+    background-color: var(--color-sacred-emerald-green-400);
+  }
+
+  .bg-sacred-emerald-green-500 {
+    background-color: var(--color-sacred-emerald-green-500);
+  }
+
+  .bg-sacred-amethyst-purple-300 {
+    background-color: var(--color-sacred-amethyst-purple-300);
+  }
+
+  .bg-sacred-amethyst-purple-400 {
+    background-color: var(--color-sacred-amethyst-purple-400);
+  }
+
+  .bg-sacred-amethyst-purple-500 {
+    background-color: var(--color-sacred-amethyst-purple-500);
+  }
+
   .bg-purple-200 {
     background-color: var(--color-purple-200);
   }
@@ -1645,6 +1755,23 @@
   .bg-gradient-to-t {
     --tw-gradient-position: to top in oklab;
     background-image: linear-gradient(var(--tw-gradient-stops));
+  }
+
+  /* Divine Design System - Sacred Gradient Utilities */
+  .bg-gradient-dawn {
+    --tw-gradient-position: 135deg in oklab;
+    --tw-gradient-from: var(--color-sacred-lotus-pink-400);
+    --tw-gradient-to: var(--color-sacred-sky-blue-400);
+    --tw-gradient-stops: var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%;
+    background-image: linear-gradient(var(--tw-gradient-position), var(--tw-gradient-stops));
+  }
+
+  .bg-gradient-dusk {
+    --tw-gradient-position: 135deg in oklab;
+    --tw-gradient-from: var(--color-sacred-emerald-green-400);
+    --tw-gradient-to: var(--color-sacred-amethyst-purple-400);
+    --tw-gradient-stops: var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%;
+    background-image: linear-gradient(var(--tw-gradient-position), var(--tw-gradient-stops));
   }
 
   .from-\[\#1a1a2e\] {
@@ -2276,6 +2403,36 @@
     line-height: var(--tw-leading, var(--text-xs--line-height));
   }
 
+  /* Divine Design System - Sacred Typography Utilities */
+  .text-whisper {
+    font-size: var(--text-whisper);
+    line-height: var(--tw-leading, var(--text-whisper--line-height));
+    letter-spacing: var(--text-whisper--letter-spacing);
+  }
+
+  .text-body {
+    font-size: var(--text-body);
+    line-height: var(--tw-leading, var(--text-body--line-height));
+  }
+
+  .text-mantra {
+    font-size: var(--text-mantra);
+    line-height: var(--tw-leading, var(--text-mantra--line-height));
+    font-weight: var(--text-mantra--font-weight);
+  }
+
+  .text-devotion {
+    font-size: var(--text-devotion);
+    line-height: var(--tw-leading, var(--text-devotion--line-height));
+    font-weight: var(--text-devotion--font-weight);
+  }
+
+  .text-heading {
+    font-size: var(--text-heading);
+    line-height: var(--tw-leading, var(--text-heading--line-height));
+    font-weight: var(--text-heading--font-weight);
+  }
+
   .leading-none {
     --tw-leading: 1;
     line-height: 1;
@@ -2567,6 +2724,17 @@
 
   .shadow-xl {
     --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color, #0000001a), 0 8px 10px -6px var(--tw-shadow-color, #0000001a);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+
+  /* Divine Design System - Sacred Glow Utilities */
+  .inner-glow-active {
+    --tw-inset-shadow: inset 0 0 12px rgba(var(--primary-rgb, 59, 130, 246), 0.35);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+
+  .outer-glow-floating {
+    --tw-shadow: 0 16px 40px rgba(var(--primary-rgb, 59, 130, 246), 0.25);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
 
@@ -4171,5 +4339,43 @@ html {
   to {
     opacity: var(--tw-exit-opacity, 1);
     transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
+  }
+}
+
+/* Divine Design System - Sacred Motion Keyframes */
+@keyframes meditation-breath {
+  0%, 100% {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes quick-feedback {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(var(--primary-rgb, 59, 130, 246), 0.1);
+  }
+  50% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 4px rgba(var(--primary-rgb, 59, 130, 246), 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(var(--primary-rgb, 59, 130, 246), 0.1);
+  }
+}
+
+@keyframes sacred-transition {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Flame, Infinity, Heart, X, Edit3, Sparkles, Sun, Check, Star } from "lucide-react";
 import { Header } from './Header';
+import { StreaksComponent } from './StreaksComponent';
+import { StreakMilestone } from '../data/rewards';
 import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
 
 interface HistoryEntry {
   date: string;
   count: number;
   goalAchieved: boolean;
+  practiceId: string;
 }
 
 interface JournalEntry {
@@ -16,25 +19,103 @@ interface JournalEntry {
 }
 
 interface PracticeJournalScreenProps {
+  counterName: string;
   todayProgress: number;
   dailyGoal: number;
   streak: number;
+  longestStreak: number;
   history: HistoryEntry[];
+  activePracticeId: string;
   journalEntries?: JournalEntry[];
+  unlockedRewards: string[];
+  milestones?: StreakMilestone[];
   onAddJournalEntry?: (entry: JournalEntry) => void;
 }
 
 export function PracticeJournalScreen({ 
+  counterName,
   todayProgress, 
   dailyGoal, 
-  streak, 
+  streak: _legacyStreak,
+  longestStreak: _legacyLongestStreak,
   history,
+  activePracticeId,
   journalEntries = [],
+  unlockedRewards: _unusedUnlockedRewards,
+  milestones = [],
   onAddJournalEntry 
 }: PracticeJournalScreenProps) {
 
+  const filteredHistory = history.filter(entry => entry.practiceId === activePracticeId);
+
+  const todayKey = new Date().toDateString();
+  const isTodayGoalMet = todayProgress >= dailyGoal;
+  const achievedDateStrings = filteredHistory
+    .filter(entry => entry.goalAchieved)
+    .map(entry => entry.date)
+    .filter((dateString): dateString is string => Boolean(dateString));
+
+  if (isTodayGoalMet) {
+    achievedDateStrings.push(todayKey);
+  }
+
+  const uniqueAchievedDates = Array.from(new Set(achievedDateStrings));
+
+  const currentStreakValue = (() => {
+    if (uniqueAchievedDates.length === 0) {
+      return 0;
+    }
+
+    const achievedSet = new Set(uniqueAchievedDates);
+    let streakDays = 0;
+    const cursor = new Date();
+
+    while (achievedSet.has(cursor.toDateString())) {
+      streakDays += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    return streakDays;
+  })();
+
+  const longestStreakValue = (() => {
+    if (uniqueAchievedDates.length === 0) {
+      return currentStreakValue;
+    }
+
+    const sortedDates = uniqueAchievedDates
+      .map(dateString => new Date(dateString))
+      .filter(date => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    if (sortedDates.length === 0) {
+      return currentStreakValue;
+    }
+
+    let longest = 1;
+    let running = 1;
+
+    for (let index = 1; index < sortedDates.length; index += 1) {
+      const previous = sortedDates[index - 1];
+      const current = sortedDates[index];
+      const diffInDays = Math.round((current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffInDays === 1) {
+        running += 1;
+      } else {
+        running = 1;
+      }
+
+      if (running > longest) {
+        longest = running;
+      }
+    }
+
+    return Math.max(longest, currentStreakValue);
+  })();
+
   // Calculate all-time total
-  const allTimeTotal = history.reduce((sum, entry) => sum + entry.count, 0) + todayProgress;
+  const allTimeTotal = filteredHistory.reduce((sum, entry) => sum + entry.count, 0) + todayProgress;
   
   // Generate last 7 days data
   const generateLast7Days = () => {
@@ -50,7 +131,7 @@ export function PracticeJournalScreen({
       
       const isToday = i === 0;
       const isPast = i > 0; // Yesterday or before
-      const historyEntry = history.find(entry => entry.date === dateString);
+      const historyEntry = filteredHistory.find(entry => entry.date === dateString);
       const journalEntry = journalEntries.find(entry => entry.date === dateString);
       
       let malasCompleted = 0;
@@ -118,7 +199,7 @@ export function PracticeJournalScreen({
       {/* Header */}
       <Header
         title="My Journey"
-        subtitle="Track your spiritual progress and reflections"
+        subtitle={counterName}
       />
       
       {/* Background decoration */}
@@ -144,7 +225,9 @@ export function PracticeJournalScreen({
             whileHover={{ scale: 1.03, y: -2 }}
             whileTap={{ scale: 0.98 }}
             style={{
-              boxShadow: streak > 0 ? '0 8px 32px rgba(255, 140, 66, 0.15)' : '0 4px 16px rgba(0, 0, 0, 0.08)'
+              boxShadow: currentStreakValue > 0
+                ? '0 8px 32px rgba(255, 140, 66, 0.15)'
+                : '0 4px 16px rgba(0, 0, 0, 0.08)'
             }}
           >
             {/* Background pattern */}
@@ -156,18 +239,18 @@ export function PracticeJournalScreen({
             <div className="relative flex flex-col items-center text-center">
               <motion.div
                 animate={{ 
-                  scale: streak > 0 ? [1, 1.15, 1] : [1],
-                  rotate: streak > 0 ? [0, 5, -5, 0] : [0]
+                  scale: currentStreakValue > 0 ? [1, 1.15, 1] : [1],
+                  rotate: currentStreakValue > 0 ? [0, 5, -5, 0] : [0]
                 }}
                 transition={{ duration: 3, repeat: Infinity }}
                 className="mb-4"
               >
-                <Flame size={28} className={`${streak > 0 ? 'text-orange-500' : 'text-gray-400'} drop-shadow-sm`} />
+                <Flame size={28} className={`${currentStreakValue > 0 ? 'text-orange-500' : 'text-gray-400'} drop-shadow-sm`} />
               </motion.div>
-              <div className="text-3xl text-orange-600 dark:text-orange-400 mb-1">{streak}</div>
+              <div className="text-3xl text-orange-600 dark:text-orange-400 mb-1">{currentStreakValue}</div>
               <div className="text-sm text-orange-500/80 dark:text-orange-400/80">Day Streak</div>
               
-              {streak > 0 && (
+              {currentStreakValue > 0 && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -202,7 +285,7 @@ export function PracticeJournalScreen({
               </motion.div>
               <div className="text-3xl text-purple-600 dark:text-purple-400 mb-1">{allTimeTotal}</div>
               <div className="text-sm text-purple-500/80 dark:text-purple-400/80 mb-1">All-Time</div>
-              <div className="text-xs text-purple-400/60 dark:text-purple-300/60">Total Malas</div>
+              <div className="text-xs text-purple-400/60 dark:text-purple-300/60">Total Cycles</div>
             </div>
           </motion.div>
         </motion.div>
@@ -343,8 +426,25 @@ export function PracticeJournalScreen({
           </motion.div>
         </motion.div>
 
+        {/* Streaks and Rewards Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="mb-8"
+        >
+          <StreaksComponent
+            currentStreak={currentStreakValue}
+            longestStreak={longestStreakValue}
+            milestones={milestones}
+            onMilestoneClick={(milestone) => {
+              console.log('Milestone clicked:', milestone);
+            }}
+          />
+        </motion.div>
+
         {/* Enhanced Empty State */}
-        {history.length === 0 && todayProgress === 0 && (
+        {filteredHistory.length === 0 && todayProgress === 0 && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -377,7 +477,7 @@ export function PracticeJournalScreen({
               transition={{ delay: 0.7 }}
               className="text-2xl text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-orange-500 mb-4"
             >
-              Your Sacred Journey Awaits
+              Your Mindful Journey Awaits
             </motion.h3>
             
             <motion.p 
@@ -386,7 +486,7 @@ export function PracticeJournalScreen({
               transition={{ delay: 0.9 }}
               className="text-muted-foreground leading-relaxed max-w-md mx-auto text-lg"
             >
-              Begin with a single breath, a whispered mantra. Watch as your dedication paints a beautiful tapestry of mindful moments across this sacred calendar.
+              Begin with a single breath, a whispered affirmation. Watch as your dedication paints a beautiful tapestry of mindful moments across this mindful calendar.
             </motion.p>
             
             <motion.div

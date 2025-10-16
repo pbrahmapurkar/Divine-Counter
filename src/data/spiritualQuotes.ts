@@ -127,7 +127,7 @@ export const spiritualQuotes = [
   "Everything in the universe is within you. Ask all from yourself.",
   "You are not a human being having a spiritual experience. You are a spiritual being having a human experience.",
   "The soul becomes dyed with the color of its thoughts.",
-  "Your sacred space is where you can find yourself again and again.",
+  "Your mindful space is where you can find yourself again and again.",
   "The divine is not something high above us. It is in heaven, it is in earth, it is inside us.",
   "Let go of what has passed. Let go of what may come. Let go of what is happening now. Don't try to figure anything out. Don't try to make anything happen. Relax, right now, and rest.",
   "The secret of health for both mind and body is not to mourn for the past, worry about the future, or anticipate troubles, but to live in the present moment wisely and earnestly.",
@@ -142,13 +142,20 @@ export const spiritualQuotes = [
   "May you be filled with loving kindness. May you be well. May you be at peace and at ease. May you be happy.",
   "May all beings be happy. May all beings be peaceful. May all beings be free from suffering.",
   "Deep in meditation, the self is forgotten and only pure awareness remains.",
-  "The mantra becomes one with the breath, and the breath becomes one with the soul.",
+  "The affirmation becomes one with the breath, and the breath becomes one with the soul.",
   "With each bead, we count not numbers, but blessings.",
   "In the rhythm of repetition, we find the music of the divine.",
-  "Every mala round is a journey inward to the temple of the heart.",
-  "Sacred words, sacred breaths, sacred moments - this is the path of the mala.",
-  "Through devotion and practice, the ordinary becomes extraordinary, the mundane becomes sacred.",
+  "Every cycle is a journey inward to the temple of the heart.",
+  "Mindful words, mindful breaths, mindful moments - this is the path of the cycle.",
+  "Through devotion and practice, the ordinary becomes extraordinary, the mundane becomes mindful.",
   "Om Shanti Shanti Shanti - Peace in body, mind, and spirit."
 ];
+
+
+
+
+
+
+
 
 

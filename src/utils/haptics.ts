@@ -1,96 +1,98 @@
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { Capacitor } from '@capacitor/core';
 
-export class HapticsService {
-  static async vibrate(style: ImpactStyle = ImpactStyle.Medium) {
-    try {
-      await Haptics.impact({ style });
-    } catch (error) {
-      console.warn('Haptics not available:', error);
-      // Fallback to web vibration API if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
+/**
+ * Divine Design System - Sacred Haptic Feedback
+ * 
+ * A unified haptic feedback system that provides gentle, spiritually resonant
+ * tactile responses throughout the Divine Counter app.
+ */
+
+export type HapticType = 'gentle' | 'celebration' | 'warning';
+
+const HAPTIC_MAP: Record<HapticType, {
+  impactStyle?: ImpactStyle;
+  notificationType?: NotificationType;
+  webVibrationPattern?: number[];
+}> = {
+  gentle: {
+    impactStyle: ImpactStyle.Light,
+    webVibrationPattern: [50]
+  },
+  celebration: {
+    notificationType: NotificationType.Success,
+    webVibrationPattern: [100, 50, 100, 50, 200]
+  },
+  warning: {
+    impactStyle: ImpactStyle.Medium,
+    webVibrationPattern: [200, 100, 200]
+  }
+};
+
+/**
+ * Triggers haptic feedback with the specified type
+ * 
+ * @param type - The type of haptic feedback to trigger
+ * @param options - Optional configuration
+ */
+export async function triggerHaptic(
+  type: HapticType = 'gentle',
+  options: { enableVibrateFallback?: boolean } = {}
+): Promise<void> {
+  const { enableVibrateFallback = true } = options;
+  const config = HAPTIC_MAP[type];
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // Use native haptics on mobile platforms
+      if (config.impactStyle) {
+        await Haptics.impact({ style: config.impactStyle });
       }
-    }
-  }
-
-  static async light() {
-    await this.vibrate(ImpactStyle.Light);
-  }
-
-  static async medium() {
-    await this.vibrate(ImpactStyle.Medium);
-  }
-
-  static async heavy() {
-    await this.vibrate(ImpactStyle.Heavy);
-  }
-
-  /**
-   * Light, sharp tap for each count/tap
-   * Uses Haptics.selectionStart() as specified
-   */
-  static async tap() {
-    try {
-      await Haptics.selectionStart();
-    } catch (error) {
-      console.warn('Haptics selection not available:', error);
-      // Fallback to light impact
-      await this.light();
-    }
-  }
-
-  /**
-   * Celebratory vibration for mala completion
-   * Uses Haptics.notification with SUCCESS type as specified
-   */
-  static async completion() {
-    try {
-      await Haptics.notification({ type: NotificationType.SUCCESS });
-    } catch (error) {
-      console.warn('Haptics notification not available:', error);
-      // Fallback to web vibration API with celebratory pattern
-      if (navigator.vibrate) {
-        navigator.vibrate([100, 50, 100, 50, 200]); // Success pattern
+      if (config.notificationType) {
+        await Haptics.notification({ type: config.notificationType });
       }
-    }
-  }
-
-  /**
-   * Medium-intensity tap for key actions (reset, delete, etc.)
-   * Uses Haptics.impact with MEDIUM style as specified
-   */
-  static async action() {
-    try {
-      await Haptics.impact({ style: ImpactStyle.Medium });
-    } catch (error) {
-      console.warn('Haptics impact not available:', error);
+    } else if (enableVibrateFallback && 'vibrate' in navigator) {
       // Fallback to web vibration API
-      if (navigator.vibrate) {
-        navigator.vibrate(100);
+      if (config.webVibrationPattern) {
+        navigator.vibrate(config.webVibrationPattern);
       }
     }
-  }
-
-  // Legacy methods for backward compatibility
-  static async selection() {
-    await this.tap();
-  }
-
-  static async notification(type: 'success' | 'warning' | 'error' = 'success') {
-    if (type === 'success') {
-      await this.completion();
-    } else {
+  } catch (error) {
+    console.warn('Haptic feedback failed:', error);
+    
+    // Final fallback to web vibration if native haptics fail
+    if (enableVibrateFallback && 'vibrate' in navigator && config.webVibrationPattern) {
       try {
-        const notificationType = type === 'warning' ? NotificationType.WARNING : NotificationType.ERROR;
-        await Haptics.notification({ type: notificationType });
-      } catch (error) {
-        console.warn('Haptics notification not available:', error);
-        // Fallback to web vibration API
-        if (navigator.vibrate) {
-          const pattern = type === 'warning' ? [100, 50, 100] : [200, 100, 200];
-          navigator.vibrate(pattern);
-        }
+        navigator.vibrate(config.webVibrationPattern);
+      } catch (vibrationError) {
+        console.warn('Web vibration fallback also failed:', vibrationError);
       }
     }
   }
 }
+
+/**
+ * Convenience function for gentle haptic feedback (taps, selections)
+ */
+export const gentleHaptic = () => triggerHaptic('gentle');
+
+/**
+ * Convenience function for celebratory haptic feedback (achievements, completions)
+ */
+export const celebrationHaptic = () => triggerHaptic('celebration');
+
+/**
+ * Convenience function for warning haptic feedback (errors, important actions)
+ */
+export const warningHaptic = () => triggerHaptic('warning');
+
+/**
+ * Legacy compatibility function for existing code
+ * @deprecated Use triggerHaptic('gentle') instead
+ */
+export const HapticsService = {
+  tap: () => triggerHaptic('gentle'),
+  completion: () => triggerHaptic('celebration'),
+  action: () => triggerHaptic('warning')
+};
+

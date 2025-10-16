@@ -47,7 +47,7 @@ export function OnboardingCreateCounter({ cycleCount, onNext, onBack }: Onboardi
         <div className="text-center mb-8">
           <h1 className="text-2xl font-medium mb-4">Create Counter</h1>
           <p className="text-muted-foreground">
-            Set up your first mantra counter
+            Set up your first affirmation counter
           </p>
         </div>
 
@@ -55,11 +55,11 @@ export function OnboardingCreateCounter({ cycleCount, onNext, onBack }: Onboardi
           {/* Counter Name */}
           <div>
             <Label htmlFor="name" className="text-sm font-medium mb-2 block">
-              Mantra Name
+              Affirmation Name
             </Label>
             <Input
               id="name"
-              placeholder="e.g., Om Mani Padme Hum"
+              placeholder="e.g., Morning Affirmation"
               value={counter.name}
               onChange={(e) => setCounter({ ...counter, name: e.target.value })}
               className="w-full"
@@ -90,7 +90,7 @@ export function OnboardingCreateCounter({ cycleCount, onNext, onBack }: Onboardi
           {/* Daily Goal */}
           <div>
             <Label htmlFor="goal" className="text-sm font-medium mb-2 block">
-              Daily Goal (malas per day)
+              Daily Goal (cycles per day)
             </Label>
             <Input
               id="goal"
@@ -114,7 +114,7 @@ export function OnboardingCreateCounter({ cycleCount, onNext, onBack }: Onboardi
               />
               <div>
                 <div className="font-medium">
-                  {counter.name || "Mantra Name"}
+                  {counter.name || "Affirmation Name"}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {cycleCount} count • Goal: {counter.dailyGoal}/day

@@ -1,490 +1,329 @@
-import { Smartphone, Volume2, RotateCcw, Info, Shield, FileText, X, Mail, Instagram, Globe } from "lucide-react";
+import { ComponentType, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  Smartphone,
+  Volume2,
+  RotateCcw,
+  Info,
+  Shield,
+  FileText,
+  Heart,
+  Compass,
+  ChevronRight,
+  Sparkles
+} from "lucide-react";
 import { Switch } from "./ui/switch";
 import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { Header } from './Header';
-import { HapticsTest } from './HapticsTest';
-import { VolumeControlTest } from './VolumeControlTest';
-import { useState } from "react";
-import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
+import { Header } from "./Header";
+import { SafeAreaView } from "./SafeAreaView";
+
+type InfoSheetKey = "about" | "privacy" | "terms";
 
 interface SettingsScreenProps {
-  hapticFeedback: boolean;
-  onHapticFeedbackToggle: () => void;
-  volumeKeyControl: boolean;
-  onVolumeKeyControlToggle: () => void;
+  hapticsEnabled: boolean;
+  onHapticsToggle: () => void;
   onResetTutorial: () => void;
+  onOpenInfoPage: (page: InfoSheetKey) => void;
+}
+
+interface SettingsItemBase {
+  icon: ComponentType<{ size?: number }>;
+  label: string;
+  subtitle: string;
+}
+
+interface SettingsToggleItem extends SettingsItemBase {
+  type: "toggle";
+  value: boolean;
+  onChange: () => void;
+}
+
+interface SettingsActionItem extends SettingsItemBase {
+  type: "action";
+  action: "resetTutorial" | InfoSheetKey;
+}
+
+interface SettingsComingSoonItem extends SettingsItemBase {
+  type: "comingSoon";
+}
+
+type SettingsItem = SettingsToggleItem | SettingsActionItem | SettingsComingSoonItem;
+
+interface SettingsCardConfig {
+  key: string;
+  icon: React.ComponentType<{ size?: number }>;
+  title: string;
+  description?: string;
+  items: SettingsItem[];
 }
 
 export function SettingsScreen({
-  hapticFeedback,
-  onHapticFeedbackToggle,
-  volumeKeyControl,
-  onVolumeKeyControlToggle,
-  onResetTutorial
+  hapticsEnabled,
+  onHapticsToggle,
+  onResetTutorial,
+  onOpenInfoPage
 }: SettingsScreenProps) {
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
-  const [isTermsOpen, setIsTermsOpen] = useState(false);
-  const settingsGroups = [
-    {
-      title: "Appearance & Behavior",
-      items: [
-        {
-          icon: Smartphone,
-          label: "Haptic Feedback",
-          subtitle: "Vibrate gently on every tap",
-          type: "toggle" as const,
-          value: hapticFeedback,
-          onChange: onHapticFeedbackToggle
-        },
-        {
-          icon: Volume2,
-          label: "Volume Key Control",
-          subtitle: "Use volume keys to count (Beta)",
-          type: "toggle" as const,
-          value: volumeKeyControl,
-          onChange: onVolumeKeyControlToggle
-        }
-      ]
-    },
-    {
-      title: "Info & Reset",
-      items: [
-        {
-          icon: RotateCcw,
-          label: "Reset Tutorial",
-          subtitle: "Restart the onboarding flow",
-          type: "action" as const,
-          action: "resetTutorial"
-        },
-        {
-          icon: Info,
-          label: "About",
-          subtitle: "App information",
-          type: "action" as const,
-          action: "about"
-        },
-        {
-          icon: Shield,
-          label: "Privacy Policy",
-          subtitle: "How we protect your data",
-          type: "action" as const,
-          action: "privacy"
-        },
-        {
-          icon: FileText,
-          label: "Terms of Service",
-          subtitle: "Terms and conditions",
-          type: "action" as const,
-          action: "terms"
-        }
-      ]
-    }
-  ];
+  const contentPaddingTop = "calc(env(safe-area-inset-top, 0px) + 112px)";
+  const [isResetModalOpen, setResetModalOpen] = useState(false);
 
-  const handleAction = (action: string) => {
-    switch (action) {
-      case "resetTutorial":
-        if (window.confirm("Reset Tutorial?\nThis will restart the onboarding guide on the next app launch.")) {
-      onResetTutorial();
-        }
-        break;
-      case "about":
-        setIsAboutOpen(true);
-        break;
-      case "privacy":
-        setIsPrivacyOpen(true);
-        break;
-      case "terms":
-        setIsTermsOpen(true);
-        break;
+  const settingsCards: SettingsCardConfig[] = useMemo(
+    () => [
+      {
+        key: "practice-feedback",
+        icon: Heart,
+        title: "Practice Feedback",
+        description: "Tune how the app gently responds during each session.",
+        items: [
+          {
+            icon: Smartphone,
+            label: "Haptic Feedback",
+            subtitle: "Vibrate gently on every tap",
+            type: "toggle",
+            value: hapticsEnabled,
+            onChange: onHapticsToggle
+          },
+          {
+            icon: Volume2,
+            label: "Volume Key Control",
+            subtitle: "Use volume keys to count (Beta)",
+            type: "comingSoon"
+          }
+        ]
+      },
+      {
+        key: "info-reset",
+        icon: Compass,
+        title: "Info & Reset",
+        description: "Learn more about Divine Counter or start fresh when needed.",
+        items: [
+          {
+            icon: RotateCcw,
+            label: "RESET",
+            subtitle: "Restart the onboarding flow",
+            type: "action",
+            action: "resetTutorial"
+          },
+          {
+            icon: Info,
+            label: "About",
+            subtitle: "App information and philosophy",
+            type: "action",
+            action: "about"
+          },
+          {
+            icon: Shield,
+            label: "Privacy Policy",
+            subtitle: "How we protect your data",
+            type: "action",
+            action: "privacy"
+          },
+          {
+            icon: FileText,
+            label: "Terms of Service",
+            subtitle: "Guidelines and commitments",
+            type: "action",
+            action: "terms"
+          }
+        ]
+      }
+    ],
+    [hapticsEnabled, onHapticsToggle]
+  );
+
+  const handleAction = (action: SettingsActionItem["action"]) => {
+    if (action === "resetTutorial") {
+      setResetModalOpen(true);
+      return;
     }
+
+    onOpenInfoPage(action);
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <Header
-        title="Settings"
-        subtitle="Customize your experience"
-      />
-      
-      {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingTop: '100px' }}>
-        <div className="px-4 pb-24">
-        
-        <div className="space-y-6">
-          {settingsGroups.map((group) => (
-            <div key={group.title}>
-              <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
-                {group.title}
-              </h3>
-              <div className="space-y-1">
-                {group.items.map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex items-center justify-between p-4 bg-card rounded-lg border border-border"
+    <SafeAreaView className="relative flex min-h-screen flex-col bg-gradient-to-br from-background via-background to-orange-50/20 dark:to-orange-950/10">
+      <Header title="Settings" subtitle="Customize your experience" />
+
+      <main className="flex flex-1 flex-col" style={{ paddingTop: contentPaddingTop }}>
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 sm:px-6 pb-32 pt-4">
+            <div className="space-y-6 sm:space-y-8">
+              {settingsCards.map((card) => {
+                const CardIcon = card.icon;
+
+                return (
+                  <motion.div
+                    key={card.key}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="rounded-2xl border border-border/20 bg-card/90 p-4 sm:p-6 shadow-sm shadow-gray-100/50 backdrop-blur-sm dark:shadow-gray-900/20"
                   >
-                    <div className="flex items-center gap-3">
-                      <item.icon size={20} className="text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">{item.label}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {item.subtitle}
-                        </div>
+                    <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                      <span className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+                        <CardIcon size={18} />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-base sm:text-lg font-semibold text-foreground">{card.title}</h2>
+                        {card.description && (
+                          <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{card.description}</p>
+                        )}
                       </div>
                     </div>
-                    
-                    {item.type === "toggle" && (
-                      <Switch
-                        checked={item.value}
-                        onCheckedChange={item.onChange}
-                      />
-                    )}
-                    
-                    {item.type === "action" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleAction(item.action)}
-                      >
-                        {item.action === "resetTutorial" ? "Reset" : "View"}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+                    <div className="space-y-3">
+                      {card.items.map((item) => {
+                        const ItemIcon = item.icon;
+                        const isAction = item.type === "action";
+                        const isComingSoon = item.type === "comingSoon";
+                        const RowComponent = (isAction ? "button" : "div") as
+                          | "button"
+                          | "div";
+
+                        return (
+                          <RowComponent
+                            key={item.label}
+                            type={isAction ? "button" : undefined}
+                            onClick={
+                              isAction
+                                ? () => handleAction(item.action)
+                                : undefined
+                            }
+                            className={`group flex w-full items-center justify-between rounded-xl border border-border/10 bg-muted/10 px-3 sm:px-4 py-3 sm:py-4 text-left transition-all duration-200 hover:border-[#D4AF37]/30 hover:bg-muted/20 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/20 dark:bg-zinc-900/20 dark:hover:bg-zinc-900/40 min-h-[60px] touch-manipulation ${
+                              isComingSoon ? "opacity-50 pointer-events-none hover:border-border/10 hover:bg-muted/10" : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 flex-shrink-0">
+                                <ItemIcon size={16} />
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm sm:text-base font-medium text-foreground">
+                                  {item.label}
+                                </p>
+                                <p className="mt-1 text-xs sm:text-sm leading-relaxed text-muted-foreground">
+                                  {item.subtitle}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="ml-2 flex items-center flex-shrink-0">
+                              {item.type === "toggle" ? (
+                                <Switch
+                                  checked={item.value}
+                                  onCheckedChange={item.onChange}
+                                  aria-label={item.label}
+                                />
+                              ) : item.type === "comingSoon" ? (
+                                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Coming Soon
+                                </span>
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:text-[#D4AF37]" />
+                              )}
+                            </div>
+                          </RowComponent>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
-          ))}
+          </div>
+
+          {/* Version Information - Fixed at bottom of scrollable area */}
+          <div className="px-4 sm:px-6 pb-6">
+            <div className="rounded-xl border border-border/10 bg-muted/5 px-3 sm:px-4 py-3 text-center">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                Divine Counter v1.0.0
+              </p>
+            </div>
+          </div>
         </div>
-        
-        {/* Haptics Test Component */}
-        <HapticsTest hapticFeedback={hapticFeedback} />
-        
-        {/* Volume Control Test Component */}
-        <VolumeControlTest volumeKeyControl={volumeKeyControl} />
-      </div>
+      </main>
 
-      {/* About Modal */}
-      <Dialog open={isAboutOpen} onOpenChange={setIsAboutOpen}>
-        <DialogContent className="max-w-2xl mx-auto max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold text-[#D4AF37] mb-4">
-              About Divine Counter
-            </DialogTitle>
-          </DialogHeader>
-          
-          {/* Close Button */}
-          <div className="absolute top-4 right-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsAboutOpen(false)}
-              className="h-8 w-8 p-0 hover:bg-gray-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="space-y-6 text-sm leading-relaxed">
-            {/* Main Description */}
-                <div>
-              <p className="mb-4">
-                Divine Counter is your modern companion for ancient practice.
-                Created with simplicity and intention, the app offers a serene and distraction-free space to deepen meditation and mantra recitation.
-              </p>
-              
-              <p className="mb-4">
-                We believe technology should serve the soul, not overwhelm it. That's why Divine Counter focuses on the essentials—gentle counters, mindful progress tracking, and a space for reflection—helping you nurture consistency, clarity, and inner calm.
-              </p>
-              
-              <p className="text-[#D4AF37] font-medium">
-                Every tap is a step on your journey, and we're honored to walk beside you.
-              </p>
-            </div>
+      <ConfirmationModal
+        open={isResetModalOpen}
+        title="Are you sure?"
+        description="This will permanently delete all your data, including your name, practices, history, and settings. You will return to the welcome screen."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onCancel={() => setResetModalOpen(false)}
+        onConfirm={() => {
+          onResetTutorial();
+          setResetModalOpen(false);
+        }}
+      />
+    </SafeAreaView>
+  );
+}
 
-            {/* About the Creator */}
-            <div className="border-t pt-4">
-              <h3 className="font-semibold text-[#D4AF37] mb-2">About the Creator</h3>
-              <p className="mb-4">
-                Pratik Brahmapurkar is a developer, author, and yoga practitioner dedicated to blending mindfulness with modern design. With a passion for intuitive experiences and purposeful technology, he creates tools that inspire growth, discipline, and well-being.
-              </p>
-                </div>
+interface ConfirmationModalProps {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
 
-            {/* Contact & Connect */}
-            <div className="border-t pt-4">
-              <h3 className="font-semibold text-[#D4AF37] mb-3">Contact & Connect</h3>
-              <p className="mb-4 text-muted-foreground">
-                We'd love to hear your reflections, suggestions, or stories from your practice.
-              </p>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Mail size={16} className="text-[#D4AF37]" />
-                  <a 
-                    href="mailto:pbrahmapurkar@gmail.com" 
-                    className="text-blue-600 hover:underline"
-                  >
-                    pbrahmapurkar@gmail.com
-                  </a>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Instagram size={16} className="text-[#D4AF37]" />
-                  <a 
-                    href="https://instagram.com/mister.pb" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    @mister.pb
-                  </a>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Globe size={16} className="text-[#D4AF37]" />
-                  <a 
-                    href="https://misterpb.in" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    misterpb.in
-                  </a>
-                </div>
+function ConfirmationModal({
+  open,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel
+}: ConfirmationModalProps) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onCancel}
+        >
+          <motion.div
+            className="relative mx-4 w-full max-w-sm overflow-hidden rounded-3xl border border-[#D4AF37]/25 bg-card/95 p-6 shadow-[0_30px_70px_-20px_rgba(212,175,55,0.4)] backdrop-blur-xl"
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 240, damping: 28 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex flex-col items-center gap-4 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#D4AF37]/20 text-[#D4AF37] shadow-inner shadow-[#D4AF37]/30">
+                <Sparkles size={20} />
+              </span>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
               </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Privacy Policy Modal */}
-      <Dialog open={isPrivacyOpen} onOpenChange={setIsPrivacyOpen}>
-        <DialogContent className="max-w-2xl mx-auto max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold text-[#D4AF37] mb-4">
-              Privacy Policy
-            </DialogTitle>
-            <p className="text-center text-sm text-muted-foreground mb-6">
-              Effective Date: September 28, 2025
-            </p>
-          </DialogHeader>
-          
-          {/* Additional Close Button */}
-          <div className="absolute top-4 right-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsPrivacyOpen(false)}
-              className="h-8 w-8 p-0 hover:bg-gray-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="space-y-6 text-sm leading-relaxed">
-            <div>
-              <p className="mb-4">
-                At Divine Counter, your privacy is not just respected—it's central to how we design and operate the app. This policy explains what information we handle and how we protect it.
-              </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onCancel}
+                className="rounded-xl border border-border/20 bg-muted/20 py-2.5 text-sm font-medium hover:bg-muted/30"
+              >
+                {cancelLabel}
+              </Button>
+              <Button
+                type="button"
+                onClick={onConfirm}
+                className="rounded-xl bg-[#D4AF37] py-2.5 text-sm font-semibold text-black shadow-[0_14px_28px_-12px_rgba(212,175,55,0.6)] transition hover:bg-[#caa634]"
+              >
+                {confirmLabel}
+              </Button>
             </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">1. Our Privacy Promise</h3>
-              <p className="mb-4">
-                Divine Counter is built as a private sanctuary for your spiritual practice. All your data stays on your device. We do not collect, track, or share any personal information.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">2. Information We Handle</h3>
-              <p className="mb-2">The app may store the following only on your device:</p>
-              <ul className="list-disc list-inside space-y-1 mb-4 ml-4">
-                <li>Your name (if provided)</li>
-                <li>Practice details (cycle counts, goals, icons, themes)</li>
-                <li>Daily counts and progress history</li>
-                <li>Personal journal reflections</li>
-                <li>App settings (e.g., dark mode, haptic preferences)</li>
-              </ul>
-              <p className="mb-4">
-                None of this information is sent to us or third parties. The app works fully offline.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">3. Data Storage</h3>
-              <p className="mb-4">
-                Your information is saved securely in your device's local storage. You are in complete control of it.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">4. Data Deletion</h3>
-              <ul className="list-disc list-inside space-y-1 mb-4 ml-4">
-                <li>You may delete your data anytime through the app's settings.</li>
-                <li>Uninstalling the app will also remove all associated data from your device.</li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">5. Children's Privacy</h3>
-              <p className="mb-4">
-                Divine Counter is not intended for children under 13. We do not knowingly collect data from children.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">6. Updates to This Policy</h3>
-              <p className="mb-4">
-                We may update this Privacy Policy as the app evolves. Changes will be posted within the app, and the effective date will be updated.
-              </p>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="font-semibold text-[#D4AF37] mb-2">7. Contact</h3>
-              <p className="mb-4">
-                If you have any questions about this Privacy Policy, please reach out:
-              </p>
-              <div className="flex items-center gap-3">
-                <Mail size={16} className="text-[#D4AF37]" />
-                <a 
-                  href="mailto:pbrahmapurkar@gmail.com" 
-                  className="text-blue-600 hover:underline"
-                >
-                  pbrahmapurkar@gmail.com
-                </a>
-              </div>
-            </div>
-          </div>
-          
-          {/* Close Button at Bottom */}
-          <div className="flex justify-center mt-6 pt-4 border-t">
-            <Button
-              onClick={() => setIsPrivacyOpen(false)}
-              className="bg-[#D4AF37] hover:bg-[#B8941F] text-white px-8 py-2"
-            >
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Terms of Service Modal */}
-      <Dialog open={isTermsOpen} onOpenChange={setIsTermsOpen}>
-        <DialogContent className="max-w-2xl mx-auto max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold text-[#D4AF37] mb-4">
-              Terms of Service
-            </DialogTitle>
-            <p className="text-center text-sm text-muted-foreground mb-6">
-              Effective Date: September 28, 2025
-            </p>
-          </DialogHeader>
-          
-          <div className="space-y-6 text-sm leading-relaxed">
-            <div>
-              <p className="mb-4">
-                Please read these Terms carefully before using Divine Counter. By downloading or using the app, you agree to the following:
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">1. Agreement to Terms</h3>
-              <p className="mb-4">
-                Your use of Divine Counter is conditioned on your acceptance of these Terms. If you do not agree, please do not use the app.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">2. Purpose of the App</h3>
-              <p className="mb-4">
-                Divine Counter is a personal tool to support spiritual and meditation practices. You agree to use it only for lawful, intended purposes.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">3. User Data</h3>
-              <ul className="list-disc list-inside space-y-1 mb-4 ml-4">
-                <li>You own all content you create (practice data, counts, journal entries).</li>
-                <li>All data is stored locally on your device.</li>
-                <li>You are solely responsible for managing and backing up your data.</li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">4. Intellectual Property</h3>
-              <p className="mb-4">
-                The app's design, features, and content are the exclusive property of Pratik Brahmapurkar.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">5. Disclaimer of Warranties</h3>
-              <p className="mb-4">
-                The app is provided "as is" without guarantees of uninterrupted use or error-free performance. While we strive for reliability, we cannot be responsible for data loss. We recommend making regular backups via the export feature.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">6. Limitation of Liability</h3>
-              <p className="mb-4">
-                In no event shall the developer be liable for indirect or consequential damages, including but not limited to loss of data or interruptions to practice.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#D4AF37] mb-2">7. Changes to Terms</h3>
-              <p className="mb-4">
-                We may update these Terms from time to time. Updates will be reflected within the app, along with the effective date.
-              </p>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="font-semibold text-[#D4AF37] mb-3">8. Contact</h3>
-              <p className="mb-4">
-                For questions or feedback, please connect with us:
-              </p>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Mail size={16} className="text-[#D4AF37]" />
-                  <a 
-                    href="mailto:pbrahmapurkar@gmail.com" 
-                    className="text-blue-600 hover:underline"
-                  >
-                    pbrahmapurkar@gmail.com
-                  </a>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Instagram size={16} className="text-[#D4AF37]" />
-                  <a 
-                    href="https://instagram.com/mister.pb" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    @mister.pb
-                  </a>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Globe size={16} className="text-[#D4AF37]" />
-                  <a 
-                    href="https://misterpb.in" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    misterpb.in
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      </div>
-        </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

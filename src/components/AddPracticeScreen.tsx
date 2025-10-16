@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, Check } from "lucide-react";
-import { Header } from './Header'; // Assuming Header component exists
+import { Header } from './Header';
 
 // Assumes theme is now in a central file, e.g., src/config/theme.ts
 // import { goldenSunriseTheme } from '../config/theme'; 
@@ -26,6 +26,8 @@ interface Counter {
   cycleCount: number;
   dailyGoal: number;
   icon?: string;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
 
 interface AddPracticeScreenProps {
@@ -55,6 +57,8 @@ export function AddPracticeScreen({ onSave, onBack }: AddPracticeScreenProps) {
   const [customCycle, setCustomCycle] = useState("");
   const [practiceName, setPracticeName] = useState("");
   const [dailyGoal, setDailyGoal] = useState(3);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState("09:00");
 
   const selectedTheme = goldenSunriseTheme;
 
@@ -67,7 +71,9 @@ export function AddPracticeScreen({ onSave, onBack }: AddPracticeScreenProps) {
         color: selectedTheme.accentColor,
         cycleCount: finalCycleCount,
         dailyGoal,
-        icon: "lotus"
+        icon: "lotus",
+        reminderEnabled,
+        reminderTime
       });
       onBack();
     }
@@ -115,6 +121,29 @@ export function AddPracticeScreen({ onSave, onBack }: AddPracticeScreenProps) {
             setDailyGoal={setDailyGoal}
             theme={selectedTheme}
           />
+
+          {/*
+          <ReminderSettings
+            reminderEnabled={reminderEnabled}
+            reminderTime={reminderTime}
+            onToggle={(value: boolean) => setReminderEnabled(value)}
+            onOpenPicker={() => {
+              if (!reminderEnabled) return;
+              openTimePicker();
+            }}
+            formattedTime={formatReminderTime(reminderTime)}
+            theme={selectedTheme}
+          />
+
+          <input
+            ref={timeInputRef}
+            type="time"
+            value={reminderTime}
+            onChange={(event) => setReminderTime(event.target.value || "09:00")}
+            className="hidden"
+          />
+          */}
+
         </div>
       </div>
 
@@ -165,7 +194,7 @@ const MalaCountSelector = ({ selectedCycle, setSelectedCycle, customCycle, setCu
     transition={{ duration: 0.8, delay: 0.2 }}
   >
     <h3 className="text-lg mb-4" style={{ color: theme.accentColor }}>
-      Mala Count
+      Cycle Count
     </h3>
     <div className="grid grid-cols-2 gap-3 mb-4">
       {cycleCounts.map((count) => (
@@ -237,7 +266,7 @@ const PracticeNameInput = ({ practiceName, setPracticeName, theme }: any) => (
     </h3>
     <input
       type="text"
-      placeholder="e.g., Morning Japa, Peace Meditation"
+      placeholder="e.g., Morning Practice, Peace Meditation"
       value={practiceName}
       onChange={(e) => setPracticeName(e.target.value)}
       className="w-full p-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl outline-none transition-all duration-300 focus:shadow-lg"
@@ -271,7 +300,7 @@ const DailyGoalStepper = ({ dailyGoal, setDailyGoal, theme }: any) => (
           {dailyGoal}
         </div>
         <div className="text-xs text-gray-500">
-          malas per day
+          cycles per day
         </div>
       </div>
       <button
@@ -284,3 +313,52 @@ const DailyGoalStepper = ({ dailyGoal, setDailyGoal, theme }: any) => (
     </div>
   </motion.div>
 );
+
+/*
+const ReminderSettings = ({
+  reminderEnabled,
+  reminderTime,
+  onToggle,
+  onOpenPicker,
+  formattedTime,
+  theme
+}: {
+  reminderEnabled: boolean;
+  reminderTime: string;
+  onToggle: (value: boolean) => void;
+  onOpenPicker: () => void;
+  formattedTime: string;
+  theme: Theme;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.8, delay: 0.6 }}
+    className="space-y-3"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-lg" style={{ color: theme.accentColor }}>
+          Daily Reminder
+        </h3>
+        <p className="text-xs text-gray-500">Stay on track with a gentle nudge.</p>
+      </div>
+      <Switch checked={reminderEnabled} onCheckedChange={onToggle} aria-label="Toggle daily reminder" />
+    </div>
+
+    <button
+      type="button"
+      onClick={onOpenPicker}
+      disabled={!reminderEnabled}
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 ${
+        reminderEnabled
+          ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm'
+          : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+      }`}
+    >
+      <span className="text-sm font-medium">Remind me at</span>
+      <span className="text-sm font-semibold">{formattedTime}</span>
+    </button>
+  </motion.div>
+);
+*/

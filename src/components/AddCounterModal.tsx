@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Sun, Moon, Star, Flower, Triangle, Circle, Heart, Zap, ChevronLeft } from "lucide-react";
 import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
+import { Switch } from "./ui/switch";
 
 interface Counter {
   name: string;
@@ -12,6 +13,8 @@ interface Counter {
   cycleCount: number;
   dailyGoal: number;
   icon?: string;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
 
 interface AddCounterModalProps {
@@ -50,11 +53,37 @@ export function AddCounterModal({ isOpen, onClose, onAdd }: AddCounterModalProps
     color: "#FF8C42",
     cycleCount: 108,
     dailyGoal: 3,
-    icon: "lotus"
+    icon: "lotus",
+    reminderEnabled: false,
+    reminderTime: "09:00"
   });
 
   const [customCycle, setCustomCycle] = useState("");
   const [useCustomCycle, setUseCustomCycle] = useState(false);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
+
+  const formatReminderTime = (time: string) => {
+    const [hours, minutes] = time.split(":");
+    if (hours === undefined || minutes === undefined) return "09:00 AM";
+    const hour = parseInt(hours, 10);
+    const minute = parseInt(minutes, 10);
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return "09:00 AM";
+    const period = hour >= 12 ? "PM" : "AM";
+    const hour12 = ((hour + 11) % 12) + 1;
+    return `${hour12.toString().padStart(2, '0')}:${minutes} ${period}`;
+  };
+
+  const openTimePicker = () => {
+    const node = timeInputRef.current;
+    if (!node) return;
+    const showPicker = (node as any).showPicker;
+    if (typeof showPicker === 'function') {
+      showPicker.call(node);
+    } else {
+      node.focus();
+      node.click();
+    }
+  };
 
   const handleAdd = () => {
     if (counter.name.trim() && counter.dailyGoal > 0) {
@@ -70,7 +99,9 @@ export function AddCounterModal({ isOpen, onClose, onAdd }: AddCounterModalProps
       color: "#FF8C42",
       cycleCount: 108,
       dailyGoal: 3,
-      icon: "lotus"
+      icon: "lotus",
+      reminderEnabled: false,
+      reminderTime: "09:00"
     });
     setCustomCycle("");
     setUseCustomCycle(false);
@@ -109,7 +140,7 @@ export function AddCounterModal({ isOpen, onClose, onAdd }: AddCounterModalProps
             </Button>
           </div>
           <DialogDescription>
-            Create a new spiritual practice with your preferred sacred symbol, cycle count, color, and daily intention.
+            Create a new spiritual practice with your preferred personal symbol, cycle count, color, and daily intention.
           </DialogDescription>
         </DialogHeader>
         
@@ -131,7 +162,7 @@ export function AddCounterModal({ isOpen, onClose, onAdd }: AddCounterModalProps
           {/* Icon Selection */}
           <div>
             <Label className="text-sm font-medium mb-3 block">
-              Sacred Symbol
+              Personal Symbol
             </Label>
             <div className="grid grid-cols-4 gap-2">
               {presetIcons.map((icon) => {
@@ -233,6 +264,43 @@ export function AddCounterModal({ isOpen, onClose, onAdd }: AddCounterModalProps
               className="w-full"
               min="1"
               max="20"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium block">Daily Reminder</Label>
+                <p className="text-xs text-muted-foreground">Receive a gentle prompt at your chosen time.</p>
+              </div>
+              <Switch
+                checked={counter.reminderEnabled}
+                onCheckedChange={(value) => setCounter(prev => ({ ...prev, reminderEnabled: value }))}
+                aria-label="Toggle daily reminder"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!counter.reminderEnabled) return;
+                openTimePicker();
+              }}
+              disabled={!counter.reminderEnabled}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 ${
+                counter.reminderEnabled
+                  ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm'
+                  : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <span className="text-sm font-medium">Remind me at</span>
+              <span className="text-sm font-semibold">{formatReminderTime(counter.reminderTime)}</span>
+            </button>
+            <input
+              ref={timeInputRef}
+              type="time"
+              value={counter.reminderTime}
+              onChange={(event) => setCounter(prev => ({ ...prev, reminderTime: event.target.value || "09:00" }))}
+              className="hidden"
             />
           </div>
         </div>

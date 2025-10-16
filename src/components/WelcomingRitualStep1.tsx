@@ -68,7 +68,7 @@ export function WelcomingRitualStep1({ onNext }: WelcomingRitualStep1Props) {
           />
         </motion.div>
 
-        {/* Namaste Greeting */}
+        {/* Greeting */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -86,7 +86,7 @@ export function WelcomingRitualStep1({ onNext }: WelcomingRitualStep1Props) {
               ease: "easeInOut"
             }}
           >
-            {name ? `Namaste, ${name}` : "Namaste"}
+            {name ? `Hello, ${name}` : "Hello"}
           </motion.h1>
           <motion.p 
             className="text-lg text-gray-600 leading-relaxed"
@@ -111,7 +111,7 @@ export function WelcomingRitualStep1({ onNext }: WelcomingRitualStep1Props) {
             animate={{ opacity: 1 }}
             transition={{ delay: 1.0 }}
           >
-            How may we address you<br />on your sacred journey?
+            How may we address you<br />on your mindful journey?
           </motion.p>
           
           <div className="relative">

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { ChevronLeft, Save, Sun, Moon, Star, Flower, Triangle, Circle, Heart, Zap } from "lucide-react";
 import { Header } from './Header';
 import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
+// import { Switch } from "./ui/switch";
 
 interface Counter {
   id: string;
@@ -11,6 +12,8 @@ interface Counter {
   cycleCount: number;
   dailyGoal: number;
   icon?: string;
+  reminderEnabled: boolean;
+  reminderTime: string;
 }
 
 
@@ -43,6 +46,8 @@ export function EditPracticeScreen({ counter, onSave, onBack }: EditPracticeScre
   const [customCycle, setCustomCycle] = useState("");
   const [selectedIcon, setSelectedIcon] = useState(counter.icon || "lotus");
   const [dailyGoal, setDailyGoal] = useState(counter.dailyGoal);
+  const [reminderEnabled, setReminderEnabled] = useState<boolean>(counter.reminderEnabled ?? false);
+  const [reminderTime, setReminderTime] = useState<string>(counter.reminderTime || "09:00");
 
   const getIcon = (iconName: string) => {
     const IconComponent = iconMap[iconName as keyof typeof iconMap] || Flower;
@@ -62,10 +67,13 @@ export function EditPracticeScreen({ counter, onSave, onBack }: EditPracticeScre
       name: practiceName.trim(),
       cycleCount: finalCycleCount,
       dailyGoal,
-      icon: selectedIcon
+      icon: selectedIcon,
+      reminderEnabled,
+      reminderTime
     };
 
     onSave(updatedCounter);
+    onBack();
   };
 
   const isCustomCycle = !cycleCounts.includes(selectedCycle) && !customCycle;
@@ -121,7 +129,7 @@ export function EditPracticeScreen({ counter, onSave, onBack }: EditPracticeScre
           className="space-y-4"
         >
           <label className="block text-sm font-medium text-foreground/80">
-            Sacred Symbol
+            Personal Symbol
           </label>
           <div className="grid grid-cols-4 gap-3">
             {availableIcons.map((iconName) => {
@@ -164,7 +172,7 @@ export function EditPracticeScreen({ counter, onSave, onBack }: EditPracticeScre
           className="space-y-4"
         >
           <label className="block text-sm font-medium text-foreground/80">
-            Mala Count (beads per cycle)
+            Cycle Count (beads per cycle)
           </label>
           
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -242,6 +250,53 @@ export function EditPracticeScreen({ counter, onSave, onBack }: EditPracticeScre
             className="w-full p-3 rounded-xl bg-card border border-border focus:border-saffron focus:outline-none transition-colors"
           />
         </motion.div>
+
+        {/* Reminder Settings */}
+        {/*
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-sm font-medium text-foreground/80">
+                Daily Reminder
+              </label>
+              <p className="text-xs text-muted-foreground">Receive a gentle prompt at your chosen time.</p>
+            </div>
+            <Switch
+              checked={reminderEnabled}
+              onCheckedChange={setReminderEnabled}
+              aria-label="Toggle daily reminder"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!reminderEnabled) return;
+              openTimePicker();
+            }}
+            disabled={!reminderEnabled}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 ${
+              reminderEnabled
+                ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm'
+                : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-sm font-medium">Remind me at</span>
+            <span className="text-sm font-semibold">{formatReminderTime(reminderTime)}</span>
+          </button>
+          <input
+            ref={timeInputRef}
+            type="time"
+            value={reminderTime}
+            onChange={(event) => setReminderTime(event.target.value || "09:00")}
+            className="hidden"
+          />
+        </motion.div>
+        */}
 
         {/* Preview */}
         <motion.div

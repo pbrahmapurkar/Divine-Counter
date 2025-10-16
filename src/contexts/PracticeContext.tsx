@@ -4,6 +4,7 @@ interface HistoryEntry {
   date: string;
   count: number;
   goalAchieved: boolean;
+  practiceId: string;
 }
 
 interface CounterState {
@@ -79,13 +80,16 @@ export function PracticeProvider({ children }: PracticeProviderProps) {
         const historyEntry: HistoryEntry = {
           date: lastCountDate, // This is yesterday's date
           count: currentState.todayProgress,
-          goalAchieved: currentState.todayProgress >= dailyGoal
+          goalAchieved: currentState.todayProgress >= dailyGoal,
+          practiceId: counterId
         };
 
         // Add to history
         setHistory(prevHistory => {
           // Check if entry already exists for this date to avoid duplicates
-          const existingIndex = prevHistory.findIndex(entry => entry.date === lastCountDate);
+          const existingIndex = prevHistory.findIndex(
+            entry => entry.date === lastCountDate && entry.practiceId === counterId
+          );
           if (existingIndex >= 0) {
             // Update existing entry
             const updatedHistory = [...prevHistory];
@@ -144,7 +148,8 @@ export function PracticeProvider({ children }: PracticeProviderProps) {
           const historyEntry: HistoryEntry = {
             date: lastCountDate, // This is yesterday's date
             count: currentState.todayProgress,
-            goalAchieved: currentState.todayProgress >= counter.dailyGoal
+            goalAchieved: currentState.todayProgress >= counter.dailyGoal,
+            practiceId: counter.id
           };
           newHistoryEntries.push(historyEntry);
           console.log(`Will archive counter ${counter.id}: ${lastCountDate} with ${currentState.todayProgress} malas`);
@@ -170,7 +175,9 @@ export function PracticeProvider({ children }: PracticeProviderProps) {
           
           // Add each new entry, avoiding duplicates
           newHistoryEntries.forEach(newEntry => {
-            const existingIndex = updatedHistory.findIndex(entry => entry.date === newEntry.date);
+            const existingIndex = updatedHistory.findIndex(
+              entry => entry.date === newEntry.date && entry.practiceId === newEntry.practiceId
+            );
             if (existingIndex >= 0) {
               // Update existing entry
               updatedHistory[existingIndex] = newEntry;

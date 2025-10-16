@@ -34,7 +34,7 @@ const motivationalPhrases = [
   "Trust the process",
   "Inner light",
   "Calm mind",
-  "Sacred moment"
+  "Mindful moment"
 ];
 
 // Web-compatible SafeAreaView
@@ -402,7 +402,7 @@ export function HomeScreen({
           transition={{ delay: 0.2 }}
           className="text-center"
         >
-          <div className="text-2xl text-[#D4AF37] mb-3">✨ Mala Complete! ✨</div>
+          <div className="text-2xl text-[#D4AF37] mb-3">✨ Cycle Complete! ✨</div>
           
           <div className="space-y-3 mb-4">
             <div className="flex items-center justify-center gap-3">
@@ -410,7 +410,7 @@ export function HomeScreen({
                 <Target size={16} className="text-[#D4AF37]" />
                 <span className="text-sm text-muted-foreground">Today's Progress</span>
               </div>
-              <span className="text-base text-[#D4AF37]">{modalProgress} of {counter.dailyGoal} Malas</span>
+              <span className="text-base text-[#D4AF37]">{modalProgress} of {counter.dailyGoal} Cycles</span>
             </div>
             
             <div className="flex items-center justify-center gap-3">
@@ -428,7 +428,7 @@ export function HomeScreen({
             transition={{ delay: 0.4 }}
             className="text-sm text-muted-foreground/70"
           >
-            Tap to begin the next mala
+            Tap to begin the next cycle
           </motion.p>
         </motion.div>
       </div>
@@ -441,7 +441,7 @@ export function HomeScreen({
       {/* Fixed Header */}
       <Header
         title={getLivingGreeting()}
-        subtitle={`${counter.name} • ${todayProgress}/${counter.dailyGoal} malas today`}
+        subtitle={`${counter.name} • ${todayProgress}/${counter.dailyGoal} cycles today`}
       />
       
       {/* Fixed Content Area - Entire area between header and nav bar is tappable */}

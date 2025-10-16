@@ -32,7 +32,7 @@ export function OnboardingCycleCount({ onNext, onBack }: OnboardingCycleCountPro
         <div className="text-center mb-8">
           <h1 className="text-2xl font-medium mb-4">Choose Cycle Count</h1>
           <p className="text-muted-foreground">
-            How many counts make up one mala?
+            How many counts make up one cycle?
           </p>
         </div>
 

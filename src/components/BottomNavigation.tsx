@@ -1,5 +1,4 @@
 import { Home, BookOpen, Layers, Settings } from "lucide-react";
-import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
 
 interface BottomNavigationProps {
   activeScreen: string;
@@ -23,14 +22,6 @@ export function BottomNavigation({ activeScreen, onNavigate }: BottomNavigationP
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
-      {/* Small logo indicator at top of nav */}
-      <div className="flex justify-center py-1 border-b border-gray-100 dark:border-gray-800">
-        <img 
-          src={logo} 
-          alt="Divine Counter" 
-          className="w-4 h-4 opacity-30"
-        />
-      </div>
       <div className="flex justify-around items-center py-2">
         {navItems.map(({ id, icon: Icon, label }) => (
           <button

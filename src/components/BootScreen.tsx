@@ -92,7 +92,7 @@ export function BootScreen({ onComplete }: BootScreenProps) {
               ease: "easeOut"
             }}
           >
-            Sacred Practice Companion
+            Mindful Practice Companion
           </motion.p>
         </motion.div>
 
