@@ -652,7 +652,7 @@ export default function App() {
     const setupVolumeControl = async () => {
       try {
         console.log("🔧 Setting up volume key control...");
-        const module = await import("../plugins/VolumeControl");
+        const module = await import("./plugins/VolumeControl");
         VolumeControl = module.default;
 
         if (!isActive) {
