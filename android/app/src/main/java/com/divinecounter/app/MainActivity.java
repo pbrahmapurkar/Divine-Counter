@@ -14,7 +14,7 @@ public class MainActivity extends BridgeActivity {
     }
     
     @Override
-    protected void onStart() {
+    public void onStart() {
         super.onStart();
         // Get reference to our plugin
         volumeControlPlugin = (VolumeControlPlugin) getBridge().getPlugin("VolumeControl").getInstance();
