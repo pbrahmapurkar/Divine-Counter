@@ -671,7 +671,6 @@ export default function App() {
       console.log("🛑 Volume button listener removed");
     };
   }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
-  }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
 
   const resetCurrentCount = useCallback(() => {
     if (!activeCounterId) return;
