@@ -4,30 +4,31 @@ import android.view.KeyEvent;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    
-    private VolumeControlPlugin volumeControlPlugin;
-    
-    @Override
-    public void onCreate(android.os.Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        registerPlugin(VolumeControlPlugin.class);
-    }
-    
-    @Override
-    public void onStart() {
-        super.onStart();
-        // Get reference to our plugin
-        volumeControlPlugin = (VolumeControlPlugin) getBridge().getPlugin("VolumeControl").getInstance();
-    }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        int action = event.getAction();
         int keyCode = event.getKeyCode();
         
-        // Check if it's a volume key
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-            // Let our plugin handle it
-            if (volumeControlPlugin != null && volumeControlPlugin.handleVolumeKey(keyCode, event)) {
+        // Only handle key down events to avoid duplicates
+        if (action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                // Send volume up event directly to JavaScript
+                getBridge().getWebView().post(() -> {
+                    getBridge().getWebView().evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('volumebutton', { detail: { direction: 'up' } }));",
+                        null
+                    );
+                });
+                return true; // Consume the event to prevent volume change
+            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                // Send volume down event directly to JavaScript
+                getBridge().getWebView().post(() -> {
+                    getBridge().getWebView().evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('volumebutton', { detail: { direction: 'down' } }));",
+                        null
+                    );
+                });
                 return true; // Consume the event to prevent volume change
             }
         }
