@@ -647,45 +647,41 @@ export default function App() {
     }
 
     let isActive = true;
-    let volumeButtons: typeof import("@capacitor-community/volume-buttons")["VolumeButtons"] | null = null;
-    let modulePromise: Promise<typeof import("@capacitor-community/volume-buttons")> | null = null;
+    let VolumeControl: any = null;
+    let listener: any = null;
 
     const setupVolumeControl = async () => {
       try {
         console.log("🔧 Setting up volume key control...");
-        modulePromise = import("@capacitor-community/volume-buttons");
-        const module = await modulePromise;
-        volumeButtons = module.VolumeButtons;
+        const module = await import("../plugins/VolumeControl");
+        VolumeControl = module.default;
 
         if (!isActive) {
           return;
         }
 
-        try {
-          const status = await volumeButtons.isWatching();
-          if (status.value) {
-            await volumeButtons.clearWatch();
-            console.log("🔄 Existing volume key control watcher cleared before re-initializing");
-          }
-        } catch (statusError) {
-          console.log("⚠️ Unable to verify existing volume key control watcher", statusError);
-        }
+        // Enable the plugin
+        await VolumeControl.enable();
+        console.log("✅ Volume control plugin enabled");
 
-        await volumeButtons.watchVolume({ suppressVolumeIndicator: true }, (event) => {
+        // Add event listener
+        listener = await VolumeControl.addListener('volumeButtonPressed', (event: { direction: 'up' | 'down' }) => {
           if (!isActive) {
             return;
           }
 
           if (event.direction === "up") {
             console.log("🔼 Volume UP pressed - incrementing count");
+            toast.success("🔼 Volume UP");
             handleIncrement();
           } else if (event.direction === "down") {
             console.log("🔽 Volume DOWN pressed - decrementing count");
+            toast.success("🔽 Volume DOWN");
             handleDecrement();
           }
         });
 
-        console.log("✅ Volume buttons watcher started successfully!");
+        console.log("✅ Volume buttons listener started successfully!");
         console.log("📱 Press Volume UP to increment, Volume DOWN to decrement");
       } catch (error) {
         console.error("❌ Failed to set up volume key control:", error);
@@ -700,26 +696,14 @@ export default function App() {
 
       (async () => {
         try {
-          const module = volumeButtons
-            ? { VolumeButtons: volumeButtons }
-            : modulePromise
-              ? await modulePromise
-              : null;
-          const buttons = module?.VolumeButtons;
-
-          if (!buttons) {
-            return;
+          if (listener) {
+            await listener.remove();
+            console.log("🛑 Volume key control listener removed");
           }
 
-          try {
-            await buttons.clearWatch();
-            console.log("🛑 Volume key control watcher cleared");
-          } catch (error) {
-            if (error instanceof Error && error.message.includes("not been been watched")) {
-              console.log("ℹ️ Volume key control watcher was already cleared");
-              return;
-            }
-            throw error;
+          if (VolumeControl) {
+            await VolumeControl.disable();
+            console.log("🛑 Volume key control disabled");
           }
         } catch (error) {
           console.error("❌ Failed to clean up volume key control:", error);
