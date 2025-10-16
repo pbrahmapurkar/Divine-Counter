@@ -97,8 +97,8 @@ export function VolumeButtonTester({ enabled, onVolumeUp, onVolumeDown }: Volume
 
       {/* Info Badge */}
       <div className="mt-2 rounded-full bg-black/70 px-3 py-1 text-center">
-        <p className="text-xs text-white font-medium">TEST MODE</p>
-        <p className="text-[10px] text-white/70">Emulator/Web</p>
+        <p className="text-xs text-white font-medium">VOL TEST</p>
+        <p className="text-[10px] text-white/70">Tap or ↑↓</p>
       </div>
     </div>
   );
