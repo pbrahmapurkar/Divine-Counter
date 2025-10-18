@@ -31,6 +31,7 @@ interface HomeScreenProps {
   onDecrement: () => void;
   onResetCurrentCount: () => void;
   hapticsEnabled: boolean;
+  enableVolumeKeys: boolean;
 }
 
 interface State {
@@ -114,6 +115,7 @@ export function HomeScreen({
   onDecrement,
   onResetCurrentCount,
   hapticsEnabled,
+  enableVolumeKeys,
 }: HomeScreenProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const tapAreaRef = useRef<HTMLDivElement>(null);
@@ -125,6 +127,7 @@ export function HomeScreen({
   
   // Volume key handlers with safety checks
   const handleVolumeUp = useCallback(() => {
+    console.log('🔊 Volume Up pressed - Counter incremented');
     if (!counter) {
       toast.error('No active counter selected.');
       errorHaptic();
@@ -143,6 +146,7 @@ export function HomeScreen({
   }, [counter, todayProgress, onIncrement]);
 
   const handleVolumeDown = useCallback(() => {
+    console.log('🔊 Volume Down pressed - Counter decremented');
     if (!counter) {
       toast.error('No active counter selected.');
       errorHaptic();
@@ -164,6 +168,7 @@ export function HomeScreen({
   useVolumeKeys({
     onVolumeUp: handleVolumeUp,
     onVolumeDown: handleVolumeDown,
+    enabled: enableVolumeKeys,
   });
   
   const handleReset = useCallback(() => {

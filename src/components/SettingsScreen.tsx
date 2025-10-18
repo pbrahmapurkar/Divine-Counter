@@ -10,18 +10,22 @@ import {
   Compass,
   ChevronRight,
   Sparkles,
-  Coffee
+  Coffee,
+  Volume2
 } from "lucide-react";
 import { Switch } from "./ui/switch";
 import { Button } from "./ui/button";
 import { Header } from "./Header";
 import { SafeAreaView } from "./SafeAreaView";
+import { Platform } from "../core/platform";
 
 type InfoSheetKey = "about" | "support" | "privacy" | "terms";
 
 interface SettingsScreenProps {
   hapticsEnabled: boolean;
+  enableVolumeKeys: boolean;
   onHapticsToggle: () => void;
+  onVolumeKeysToggle: () => void;
   onResetTutorial: () => void;
   onOpenInfoPage: (page: InfoSheetKey) => void;
 }
@@ -59,7 +63,9 @@ interface SettingsCardConfig {
 
 export function SettingsScreen({
   hapticsEnabled,
+  enableVolumeKeys,
   onHapticsToggle,
+  onVolumeKeysToggle,
   onResetTutorial,
   onOpenInfoPage
 }: SettingsScreenProps) {
@@ -83,10 +89,12 @@ export function SettingsScreen({
             onChange: onHapticsToggle
           },
           {
-            icon: Smartphone,
+            icon: Volume2,
             label: "Volume Button Control",
-            subtitle: "Use Volume Up/Down to count (Android only)",
-            type: "comingSoon"
+            subtitle: Platform.isAndroid() ? "Use Volume Up/Down to count" : "Unavailable on this platform",
+            type: "toggle",
+            value: enableVolumeKeys,
+            onChange: onVolumeKeysToggle
           }
         ]
       },
@@ -150,7 +158,7 @@ export function SettingsScreen({
         ]
       }
     ],
-    [hapticsEnabled, onHapticsToggle]
+    [hapticsEnabled, enableVolumeKeys, onHapticsToggle, onVolumeKeysToggle]
   );
 
   const handleAction = (action: SettingsActionItem["action"]) => {
@@ -234,6 +242,7 @@ export function SettingsScreen({
                                 <Switch
                                   checked={item.value}
                                   onCheckedChange={item.onChange}
+                                  disabled={item.label === "Volume Button Control" && !Platform.isAndroid()}
                                   aria-label={item.label}
                                 />
                               ) : item.type === "comingSoon" ? (
