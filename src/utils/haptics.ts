@@ -96,3 +96,5 @@ export const HapticsService = {
   action: () => triggerHaptic('warning')
 };
 
+
+

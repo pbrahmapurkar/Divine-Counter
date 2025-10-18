@@ -5,3 +5,4 @@ export { TermsOfServiceContent } from "./TermsOfServiceContent";
 export { AboutPage } from "./AboutPage";
 export { PrivacyPolicyPage } from "./PrivacyPolicyPage";
 export { TermsOfServicePage } from "./TermsOfServicePage";
+export { SupportProjectPage } from "./SupportProjectPage";

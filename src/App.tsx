@@ -3,12 +3,14 @@ import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { HomeScreen } from "./components/HomeScreen";
 import { CountersScreen } from "./components/CountersScreen";
 import { PracticeJournalScreen } from "./components/PracticeJournalScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
 import {
   AboutPage,
+  SupportProjectPage,
   PrivacyPolicyPage,
   TermsOfServicePage
 } from "./components/info";
@@ -68,6 +70,8 @@ const generateUniqueIntId = (): number => {
   return Math.floor(Math.random() * maxInt);
 };
 
+const DONATION_URL = "https://buymeacoffee.com/pbrahmapurd";
+
 const hydrateCounter = (raw: Partial<Counter> & { id: string | number }): Counter => {
   const reminderEnabled = Boolean(raw.reminderEnabled);
   const reminderTime = raw.reminderTime && /^\d{2}:\d{2}$/.test(raw.reminderTime)
@@ -116,7 +120,6 @@ interface JournalEntry {
 }
 interface Settings {
   hapticsEnabled: boolean;
-  volumeKeyControl: boolean;
 }
 type OnboardingStep = "greeting" | "practice" | "affirmation";
 type AppScreen =
@@ -127,6 +130,7 @@ type AppScreen =
   | "edit-practice"
   | "add-practice"
   | "about"
+  | "support"
   | "privacy"
   | "terms";
 
@@ -144,8 +148,7 @@ export default function App() {
   const [journalEntries, setJournalEntries] = useState([] as JournalEntry[]);
   const [streak, setStreak] = useState(0);
   const [settings, setSettings] = useState({
-    hapticsEnabled: true,
-    volumeKeyControl: true
+    hapticsEnabled: true
   } as Settings);
   const [isAddCounterModalOpen, setIsAddCounterModalOpen] = useState(false);
   const [editingCounterId, setEditingCounterId] = useState("");
@@ -307,7 +310,7 @@ export default function App() {
           : [];
         setHistory(normalizedHistory);
         setJournalEntries(JSON.parse(localStorage.getItem("divine-counter-journal") || '[]'));
-        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true,"volumeKeyControl":true}'));
+        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true}'));
         setActiveCounterId(savedActiveCounterId);
         setUserName(localStorage.getItem("divine-counter-username") || "");
         setUnlockedRewards(JSON.parse(localStorage.getItem("divine-counter-unlocked-rewards") || '[]'));
@@ -382,7 +385,7 @@ export default function App() {
     });
 
     return () => {
-      backHandler.remove();
+      backHandler.then(handler => handler.remove());
     };
   }, [currentScreen, isAddCounterModalOpen, isOnboarding, onboardingStep, showRewardModal]);
 
@@ -629,101 +632,6 @@ export default function App() {
     setCounterStates(prev => ({ ...prev, [activeCounterId]: { ...currentState, currentCount: currentState.currentCount - 1 } }));
   }, [activeCounterId, counterStates, settings.hapticsEnabled]);
 
-  useEffect(() => {
-    if (!settings.volumeKeyControl) {
-      console.debug("Volume key control is disabled");
-      return;
-    }
-
-    if (!activeCounterId) {
-      console.debug("Volume key control requires an active counter");
-      return;
-    }
-
-    if (!Capacitor.isNativePlatform()) {
-      console.debug("Volume key control is only available on a native device");
-      return;
-    }
-
-    let isActive = true;
-    let volumeButtons: typeof import("@capacitor-community/volume-buttons")["VolumeButtons"] | null = null;
-    let modulePromise: Promise<typeof import("@capacitor-community/volume-buttons")> | null = null;
-
-    const setupVolumeControl = async () => {
-      try {
-        console.debug("Setting up volume key control...");
-        modulePromise = import("@capacitor-community/volume-buttons");
-        const module = await modulePromise;
-        volumeButtons = module.VolumeButtons;
-
-        if (!isActive) {
-          return;
-        }
-
-        try {
-          const status = await volumeButtons.isWatching();
-          if (status.value) {
-            await volumeButtons.clearWatch();
-            console.debug("Existing volume key control watcher cleared before re-initializing");
-          }
-        } catch (statusError) {
-          console.debug("Unable to verify existing volume key control watcher", statusError);
-        }
-
-        await volumeButtons.watchVolume({ suppressVolumeIndicator: true }, (event) => {
-          if (!isActive) {
-            return;
-          }
-
-          if (event.direction === "up") {
-            console.debug("Volume UP pressed - incrementing count");
-            handleIncrement();
-          } else if (event.direction === "down") {
-            console.debug("Volume DOWN pressed - decrementing count");
-            handleDecrement();
-          }
-        });
-
-        console.debug("Volume buttons watcher started successfully");
-      } catch (error) {
-        console.error("Failed to set up volume key control", error);
-      }
-    };
-
-    setupVolumeControl();
-
-    return () => {
-      isActive = false;
-
-      (async () => {
-        try {
-          const module = volumeButtons
-            ? { VolumeButtons: volumeButtons }
-            : modulePromise
-              ? await modulePromise
-              : null;
-          const buttons = module?.VolumeButtons;
-
-          if (!buttons) {
-            return;
-          }
-
-          try {
-            await buttons.clearWatch();
-            console.debug("Volume key control watcher cleared");
-          } catch (error) {
-            if (error instanceof Error && error.message.includes("not been been watched")) {
-              console.debug("Volume key control watcher was already cleared");
-              return;
-            }
-            throw error;
-          }
-        } catch (error) {
-          console.error("Failed to clean up volume key control", error);
-        }
-      })();
-    };
-  }, [settings.volumeKeyControl, activeCounterId, handleIncrement, handleDecrement]);
 
   const resetCurrentCount = useCallback(() => {
     if (!activeCounterId) return;
@@ -742,7 +650,7 @@ export default function App() {
   const handleSelectCounter = (id: string) => { setActiveCounterId(id); setCurrentScreen("home"); };
   const handleAddCounter = useCallback(async (data: Omit<Counter, "id">) => {
     const id = generateUniqueIntId();
-    const newCounter = hydrateCounter({ ...data, id });
+    const newCounter = hydrateCounter({ ...data, id: String(id) });
 
     setCounters(prev => [...prev, newCounter]);
     setCounterStates(prev => ({
@@ -798,6 +706,29 @@ export default function App() {
     await cancelReminderForCounter(id);
     toast.success("Practice deleted");
   }, [cancelReminderForCounter, counters, activeCounterId]);
+  const handleDonate = useCallback(async () => {
+    const url = DONATION_URL;
+
+    try {
+      await Browser.open({ url });
+      return;
+    } catch (browserError) {
+      console.error("Failed to open Buy Me a Coffee via Browser plugin", browserError);
+    }
+
+    try {
+      if (typeof window !== "undefined") {
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (opened) {
+          return;
+        }
+      }
+    } catch (windowError) {
+      console.error("Failed to open Buy Me a Coffee via window fallback", windowError);
+    }
+
+    toast.error("Couldn't open the Buy Me a Coffee page. Please check your internet connection.");
+  }, []);
   const handleSettingToggle = (setting: keyof Settings) => { setSettings(prev => ({ ...prev, [setting]: !prev[setting] })); };
   const handleResetTutorial = useCallback(() => {
     const storageKeys = [
@@ -825,7 +756,7 @@ export default function App() {
     setNewReward(null);
 
     if (Capacitor.isNativePlatform()) {
-      LocalNotifications.cancelAll().catch(error => console.error("Failed to cancel notifications during reset", error));
+      LocalNotifications.cancel({ notifications: [] }).catch(error => console.error("Failed to cancel notifications during reset", error));
     }
 
     setCounters([]);
@@ -839,7 +770,7 @@ export default function App() {
     setRewards(REWARDS.map(reward => ({ ...reward, isUnlocked: false })));
     setMilestones(hydrateMilestones());
 
-    setSettings({ hapticsEnabled: true, volumeKeyControl: true });
+    setSettings({ hapticsEnabled: true });
     setUserName("");
     setOnboardingData({ userName: "" });
     setEditingCounterId("");
@@ -926,14 +857,18 @@ export default function App() {
           <SettingsScreen
             hapticsEnabled={settings.hapticsEnabled}
             onHapticsToggle={() => handleSettingToggle("hapticsEnabled")}
-            volumeKeyControlEnabled={settings.volumeKeyControl}
-            onVolumeKeyControlToggle={() => handleSettingToggle("volumeKeyControl")}
             onResetTutorial={handleResetTutorial}
             onOpenInfoPage={(key) => setCurrentScreen(key as AppScreen)}
           />
         )}
         {currentScreen === "about" && (
           <AboutPage onBack={() => setCurrentScreen("settings")} />
+        )}
+        {currentScreen === "support" && (
+          <SupportProjectPage
+            onBack={() => setCurrentScreen("settings")}
+            onDonate={handleDonate}
+          />
         )}
         {currentScreen === "privacy" && (
           <PrivacyPolicyPage onBack={() => setCurrentScreen("settings")} />
@@ -946,7 +881,6 @@ export default function App() {
             counter={counters.find(c => c.id === editingCounterId)!}
             onSave={handleUpdateCounter}
             onBack={() => setCurrentScreen("counters")}
-            rewards={rewards}
           />
         )}
         {currentScreen === "add-practice" && (
@@ -956,7 +890,7 @@ export default function App() {
           />
         )}
       </div>
-      {!["edit-practice", "add-practice", "about", "privacy", "terms"].includes(currentScreen) && (
+      {!["edit-practice", "add-practice", "about", "support", "privacy", "terms"].includes(currentScreen) && (
       <BottomNavigation
         activeScreen={currentScreen}
           onNavigate={(screen) => setCurrentScreen(screen as AppScreen)}

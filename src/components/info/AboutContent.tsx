@@ -16,91 +16,57 @@ export function AboutContent({ variant = "sheet" }: AboutContentProps) {
   return (
     <InfoArticle>
       <div className="space-y-3 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#D4AF37]/80 sm:text-sm">
-          Sacred Simplicity
-        </p>
         <h1
           className={`font-semibold text-foreground ${
             isPage ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl"
           }`}
         >
-          Divine Counter is a mindful sanctuary for your daily practice.
+          About Divine Counter
         </h1>
+        <p className="text-sm font-medium uppercase tracking-[0.28em] text-[#D4AF37]/80 sm:text-base">
+          Sacred Simplicity. Modern Stillness.
+        </p>
         <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Created with intention by Pratik Brahmapurkar, the experience is designed to blend ancient ritual with modern calm—helping every count feel meaningful.
+          Divine Counter is a mindful companion for your daily practice — designed to make every count feel meaningful. Each tap becomes a breath; each session, a moment of calm.
         </p>
       </div>
 
-      <InfoSection title="A Companion for Spiritual Rhythm">
+      <InfoSection title="Mindful by Design">
         <p>
-          Every detail in Divine Counter is crafted to reduce friction and invite focus. Gentle haptics, soft glows, and warm gradients encourage you to settle into the practice without distraction.
+          Created with intention, it blends ancient ritual with modern design — gentle haptics, soft glows, and fluid motion invite focus and presence.
         </p>
         <p>
-          Whether you are reciting mantras, counting breaths, or tracking meditative affirmations, the app adapts to your rhythm and honours the sacred pace you set.
+          Whether you’re reciting mantras, counting breaths, or tracking affirmations, Divine Counter adapts to your rhythm and honors the sacred pace you set.
         </p>
       </InfoSection>
 
       <InfoSection title="About the Creator">
         <p>
-          Pratik Brahmapurkar is a developer and author devoted to mindful design. His work strives to offer digital tools that feel soulful—balancing utility with serenity.
+          Pratik Brahmapurkar is a developer and author devoted to mindful design.
         </p>
         <p>
-          He is also the author of{" "}
-          <button
-            type="button"
-            onClick={() =>
-              openLink(
-                "https://www.amazon.com/Asanas-Ganges-Journey-Transformation-Self-Discovery-ebook/dp/B0DTKKH4Q1/"
-              )
-            }
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-[#D4AF37] underline decoration-dotted underline-offset-4 transition hover:text-[#b8902f]"
-          >
-            <span className="italic">Asanas in the Ganges</span>
-          </button>
-          , a reflection on yoga as a path of transformation.
+          His work bridges technology and stillness, crafting digital experiences that feel calm, intentional, and soulful.
         </p>
-      </InfoSection>
-
-      <InfoSection title="Connect with Pratik">
-        <p>Share reflections, feedback, or ideas—your voice helps shape the journey.</p>
-        <div className="space-y-3">
-          <ContactItem
-            label="Email"
-            value="pbrahmapurkar@gmail.com"
-            href="mailto:pbrahmapurkar@gmail.com"
-          />
-          <ContactItem
-            label="Instagram"
-            value="@mister.pb"
-            href="https://instagram.com/mister.pb"
-          />
-          <ContactItem
-            label="Website"
-            value="misterpb.in"
-            href="https://misterpb.in"
-          />
-        </div>
+        <p>
+          He is the author of{" "}
+          <span className="font-semibold text-foreground">
+            <span className="italic">Asanas in the Ganges: A Journey of Transformation Through Yoga and Self-Discovery</span>
+          </span>
+          , a reflection on inner growth and the practice of awareness through movement.
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            openLink(
+              "https://www.amazon.com/Asanas-Ganges-Journey-Transformation-Self-Discovery-ebook/dp/B0DTKKH4Q1/"
+            )
+          }
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#D4AF37] underline decoration-dotted underline-offset-4 transition hover:text-[#b8902f]"
+        >
+          <span aria-hidden="true">📖</span>
+          <span>Read Asanas in the Ganges on Amazon →</span>
+        </button>
       </InfoSection>
     </InfoArticle>
-  );
-}
-
-interface ContactItemProps {
-  label: string;
-  value: string;
-  href: string;
-}
-
-function ContactItem({ label, value, href }: ContactItemProps) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center justify-between rounded-xl border border-border/30 bg-muted/10 px-4 py-3 text-left transition hover:border-[#D4AF37]/40 hover:bg-muted/20 hover:text-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30"
-    >
-      <span className="text-sm font-semibold text-foreground">{label}</span>
-      <span className="text-sm text-muted-foreground">{value}</span>
-    </a>
   );
 }

@@ -1,4 +1,4 @@
-import { ComponentType, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Smartphone,
@@ -10,26 +10,25 @@ import {
   Heart,
   Compass,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Coffee
 } from "lucide-react";
 import { Switch } from "./ui/switch";
 import { Button } from "./ui/button";
 import { Header } from "./Header";
 import { SafeAreaView } from "./SafeAreaView";
 
-type InfoSheetKey = "about" | "privacy" | "terms";
+type InfoSheetKey = "about" | "support" | "privacy" | "terms";
 
 interface SettingsScreenProps {
   hapticsEnabled: boolean;
   onHapticsToggle: () => void;
-  volumeKeyControlEnabled: boolean;
-  onVolumeKeyControlToggle: () => void;
   onResetTutorial: () => void;
   onOpenInfoPage: (page: InfoSheetKey) => void;
 }
 
 interface SettingsItemBase {
-  icon: ComponentType<{ size?: number }>;
+  icon: React.ComponentType<{ size?: number }>;
   label: string;
   subtitle: string;
 }
@@ -62,8 +61,6 @@ interface SettingsCardConfig {
 export function SettingsScreen({
   hapticsEnabled,
   onHapticsToggle,
-  volumeKeyControlEnabled,
-  onVolumeKeyControlToggle,
   onResetTutorial,
   onOpenInfoPage
 }: SettingsScreenProps) {
@@ -89,11 +86,9 @@ export function SettingsScreen({
           {
             icon: Volume2,
             label: "Volume Key Control",
-            subtitle: "Use the device volume keys to count",
-            type: "toggle",
-            value: volumeKeyControlEnabled,
-            onChange: onVolumeKeyControlToggle
-          }
+            subtitle: "Hardware button support returns soon",
+            type: "comingSoon"
+          },
         ]
       },
       {
@@ -115,7 +110,30 @@ export function SettingsScreen({
             subtitle: "App information and philosophy",
             type: "action",
             action: "about"
-          },
+          }
+        ]
+      },
+      {
+        key: "support",
+        icon: Sparkles,
+        title: "Support the Project",
+        description: "Help Divine Counter keep growing with a small gesture.",
+        items: [
+          {
+            icon: Coffee,
+            label: "Support the Project",
+            subtitle: "Chip in via Buy Me a Coffee or PayPal.",
+            type: "action",
+            action: "support"
+          }
+        ]
+      },
+      {
+        key: "policies",
+        icon: Shield,
+        title: "Privacy & Terms",
+        description: "Understand how we protect your data and commitments.",
+        items: [
           {
             icon: Shield,
             label: "Privacy Policy",
@@ -133,7 +151,7 @@ export function SettingsScreen({
         ]
       }
     ],
-    [hapticsEnabled, onHapticsToggle, volumeKeyControlEnabled, onVolumeKeyControlToggle]
+    [hapticsEnabled, onHapticsToggle]
   );
 
   const handleAction = (action: SettingsActionItem["action"]) => {
