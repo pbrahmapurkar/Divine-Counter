@@ -120,6 +120,7 @@ interface JournalEntry {
 }
 interface Settings {
   hapticsEnabled: boolean;
+  enableVolumeKeys: boolean;
 }
 type OnboardingStep = "greeting" | "practice" | "affirmation";
 type AppScreen =
@@ -148,7 +149,8 @@ export default function App() {
   const [journalEntries, setJournalEntries] = useState([] as JournalEntry[]);
   const [streak, setStreak] = useState(0);
   const [settings, setSettings] = useState({
-    hapticsEnabled: true
+    hapticsEnabled: true,
+    enableVolumeKeys: false
   } as Settings);
   const [isAddCounterModalOpen, setIsAddCounterModalOpen] = useState(false);
   const [editingCounterId, setEditingCounterId] = useState("");
@@ -310,7 +312,7 @@ export default function App() {
           : [];
         setHistory(normalizedHistory);
         setJournalEntries(JSON.parse(localStorage.getItem("divine-counter-journal") || '[]'));
-        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true}'));
+        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true,"enableVolumeKeys":false}'));
         setActiveCounterId(savedActiveCounterId);
         setUserName(localStorage.getItem("divine-counter-username") || "");
         setUnlockedRewards(JSON.parse(localStorage.getItem("divine-counter-unlocked-rewards") || '[]'));
@@ -824,6 +826,7 @@ export default function App() {
             onDecrement={handleDecrement}
             onResetCurrentCount={resetCurrentCount}
             hapticsEnabled={settings.hapticsEnabled}
+            enableVolumeKeys={settings.enableVolumeKeys}
           />
         )}
         {currentScreen === "history" && activeCounter && activeCounterState && (
@@ -857,7 +860,9 @@ export default function App() {
         {currentScreen === "settings" && (
           <SettingsScreen
             hapticsEnabled={settings.hapticsEnabled}
+            enableVolumeKeys={settings.enableVolumeKeys}
             onHapticsToggle={() => handleSettingToggle("hapticsEnabled")}
+            onVolumeKeysToggle={() => handleSettingToggle("enableVolumeKeys")}
             onResetTutorial={handleResetTutorial}
             onOpenInfoPage={(key) => setCurrentScreen(key as AppScreen)}
           />
