@@ -54,13 +54,7 @@
       target: 'esnext',
       outDir: 'build',
       rollupOptions: {
-        external: [
-          '@capacitor/core',
-          '@capacitor/haptics',
-          '@capacitor/local-notifications',
-          '@capacitor/app',
-          '@capacitor/browser'
-        ]
+        external: []
       }
     },
     server: {

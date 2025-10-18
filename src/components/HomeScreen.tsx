@@ -5,6 +5,9 @@ import { Haptics, NotificationType } from "@capacitor/haptics";
 import { spiritualQuotes } from "../data/spiritualQuotes";
 import { GoldenLogo } from './GoldenLogo';
 import { SafeAreaHeader } from './SafeAreaView';
+import { useVolumeKeys } from '../hooks/useVolumeKeys';
+import { lightHaptic, successHaptic, errorHaptic } from '../utils/haptics';
+import { toast } from 'sonner';
 
 // --- Type Definitions ---
 interface Counter {
@@ -119,6 +122,49 @@ export function HomeScreen({
 
   const livingGreeting = useLivingGreeting(userName, streak);
   const { quote: currentQuote, isNew: quoteChangedByMala } = useSpiritualQuotes(currentCount, counter.cycleCount);
+  
+  // Volume key handlers with safety checks
+  const handleVolumeUp = useCallback(() => {
+    if (!counter) {
+      toast.error('No active counter selected.');
+      errorHaptic();
+      return;
+    }
+
+    // Check if goal is already reached
+    if (todayProgress >= counter.dailyGoal) {
+      toast.success('Goal reached 🎉');
+      successHaptic();
+      return;
+    }
+
+    onIncrement();
+    lightHaptic();
+  }, [counter, todayProgress, onIncrement]);
+
+  const handleVolumeDown = useCallback(() => {
+    if (!counter) {
+      toast.error('No active counter selected.');
+      errorHaptic();
+      return;
+    }
+
+    // Prevent negative values
+    if (currentCount <= 0) {
+      toast.error('Already at zero.');
+      errorHaptic();
+      return;
+    }
+
+    onDecrement();
+    lightHaptic();
+  }, [counter, currentCount, onDecrement]);
+
+  // Integrate volume key controls
+  useVolumeKeys({
+    onVolumeUp: handleVolumeUp,
+    onVolumeDown: handleVolumeDown,
+  });
   
   const handleReset = useCallback(() => {
     onResetCurrentCount();

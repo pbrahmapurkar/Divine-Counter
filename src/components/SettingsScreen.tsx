@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Smartphone,
-  Volume2,
   RotateCcw,
   Info,
   Shield,
@@ -84,11 +83,11 @@ export function SettingsScreen({
             onChange: onHapticsToggle
           },
           {
-            icon: Volume2,
-            label: "Volume Key Control",
-            subtitle: "Hardware button support returns soon",
+            icon: Smartphone,
+            label: "Volume Button Control",
+            subtitle: "Use Volume Up/Down to count (Android only)",
             type: "comingSoon"
-          },
+          }
         ]
       },
       {
