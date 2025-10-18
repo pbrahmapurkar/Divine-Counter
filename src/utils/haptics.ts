@@ -8,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
  * tactile responses throughout the Divine Counter app.
  */
 
-export type HapticType = 'gentle' | 'celebration' | 'warning';
+export type HapticType = 'gentle' | 'celebration' | 'warning' | 'light' | 'success' | 'error';
 
 const HAPTIC_MAP: Record<HapticType, {
   impactStyle?: ImpactStyle;
@@ -26,6 +26,18 @@ const HAPTIC_MAP: Record<HapticType, {
   warning: {
     impactStyle: ImpactStyle.Medium,
     webVibrationPattern: [200, 100, 200]
+  },
+  light: {
+    impactStyle: ImpactStyle.Light,
+    webVibrationPattern: [15]
+  },
+  success: {
+    notificationType: NotificationType.Success,
+    webVibrationPattern: [20, 40, 20]
+  },
+  error: {
+    impactStyle: ImpactStyle.Medium,
+    webVibrationPattern: [40, 20, 40]
   }
 };
 
@@ -85,6 +97,21 @@ export const celebrationHaptic = () => triggerHaptic('celebration');
  * Convenience function for warning haptic feedback (errors, important actions)
  */
 export const warningHaptic = () => triggerHaptic('warning');
+
+/**
+ * Convenience function for light haptic feedback (volume button taps)
+ */
+export const lightHaptic = () => triggerHaptic('light');
+
+/**
+ * Convenience function for success haptic feedback (goal completion)
+ */
+export const successHaptic = () => triggerHaptic('success');
+
+/**
+ * Convenience function for error haptic feedback (boundary violations)
+ */
+export const errorHaptic = () => triggerHaptic('error');
 
 /**
  * Legacy compatibility function for existing code
