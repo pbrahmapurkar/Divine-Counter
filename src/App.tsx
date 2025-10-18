@@ -838,6 +838,7 @@ export default function App() {
             journalEntries={journalEntries}
             unlockedRewards={unlockedRewards}
             milestones={milestones}
+            userName={userName}
             onAddJournalEntry={handleAddJournalEntry}
           />
         )}
@@ -862,19 +863,47 @@ export default function App() {
           />
         )}
         {currentScreen === "about" && (
-          <AboutPage onBack={() => setCurrentScreen("settings")} />
+          <>
+            <AboutPage onBack={() => setCurrentScreen("settings")} />
+            <BottomNavigation
+              activeScreen="about"
+              onNavigate={setCurrentScreen}
+              hapticsEnabled={settings.hapticsEnabled}
+            />
+          </>
         )}
         {currentScreen === "support" && (
-          <SupportProjectPage
-            onBack={() => setCurrentScreen("settings")}
-            onDonate={handleDonate}
-          />
+          <>
+            <SupportProjectPage
+              onBack={() => setCurrentScreen("settings")}
+              onDonate={handleDonate}
+            />
+            <BottomNavigation
+              activeScreen="support"
+              onNavigate={setCurrentScreen}
+              hapticsEnabled={settings.hapticsEnabled}
+            />
+          </>
         )}
         {currentScreen === "privacy" && (
-          <PrivacyPolicyPage onBack={() => setCurrentScreen("settings")} />
+          <>
+            <PrivacyPolicyPage onBack={() => setCurrentScreen("settings")} />
+            <BottomNavigation
+              activeScreen="privacy"
+              onNavigate={setCurrentScreen}
+              hapticsEnabled={settings.hapticsEnabled}
+            />
+          </>
         )}
         {currentScreen === "terms" && (
-          <TermsOfServicePage onBack={() => setCurrentScreen("settings")} />
+          <>
+            <TermsOfServicePage onBack={() => setCurrentScreen("settings")} />
+            <BottomNavigation
+              activeScreen="terms"
+              onNavigate={setCurrentScreen}
+              hapticsEnabled={settings.hapticsEnabled}
+            />
+          </>
         )}
         {currentScreen === "edit-practice" && editingCounterId && (
           <EditPracticeScreen
@@ -893,8 +922,9 @@ export default function App() {
       {!["edit-practice", "add-practice", "about", "support", "privacy", "terms"].includes(currentScreen) && (
       <BottomNavigation
         activeScreen={currentScreen}
-          onNavigate={(screen) => setCurrentScreen(screen as AppScreen)}
-        />
+        onNavigate={(screen) => setCurrentScreen(screen as AppScreen)}
+        hapticsEnabled={settings.hapticsEnabled}
+      />
       )}
       <AddCounterModal
         isOpen={isAddCounterModalOpen}

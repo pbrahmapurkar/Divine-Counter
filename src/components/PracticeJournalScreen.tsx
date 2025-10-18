@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Flame, Infinity, Heart, X, Edit3, Sparkles, Sun, Check, Star } from "lucide-react";
 import { Header } from './Header';
-import { StreaksComponent } from './StreaksComponent';
+import { MilestoneTimeline } from './MilestoneTimeline';
 import { StreakMilestone } from '../data/rewards';
 import logo from 'figma:asset/b7d698c10ce4789169489d12ec0ea8183b3ce5e6.png';
 
@@ -29,6 +29,7 @@ interface PracticeJournalScreenProps {
   journalEntries?: JournalEntry[];
   unlockedRewards: string[];
   milestones?: StreakMilestone[];
+  userName: string;
   onAddJournalEntry?: (entry: JournalEntry) => void;
 }
 
@@ -43,6 +44,7 @@ export function PracticeJournalScreen({
   journalEntries = [],
   unlockedRewards: _unusedUnlockedRewards,
   milestones = [],
+  userName,
   onAddJournalEntry 
 }: PracticeJournalScreenProps) {
 
@@ -169,8 +171,6 @@ export function PracticeJournalScreen({
 
   const last7Days = generateLast7Days();
   const goalsMetInLast7Days = last7Days.filter(day => day.goalAchieved).length;
-
-
 
 
   const formatSelectedDate = (date: Date) => {
@@ -426,14 +426,15 @@ export function PracticeJournalScreen({
           </motion.div>
         </motion.div>
 
-        {/* Streaks and Rewards Section */}
+
+        {/* Milestone Timeline Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           className="mb-8"
         >
-          <StreaksComponent
+          <MilestoneTimeline
             currentStreak={currentStreakValue}
             longestStreak={longestStreakValue}
             milestones={milestones}
