@@ -70,19 +70,10 @@ function reducer(state: State, action: Action): State {
 
 // --- Custom Hooks for Logic Separation ---
 
-const useLivingGreeting = (userName: string, streak: number) => {
+const useLivingGreeting = (userName: string) => {
   return useMemo(() => {
-    const hour = new Date().getHours();
-    let timeGreeting = "Welcome";
-    if (hour < 12) timeGreeting = "Good morning";
-    else if (hour < 17) timeGreeting = "Good afternoon";
-    else timeGreeting = "Good evening";
-
-    if (streak > 0) {
-      return `${timeGreeting}, ${userName}. You're on a ${streak}-day streak.`;
-    }
     return `Welcome, ${userName}. Let's begin today's practice.`;
-  }, [userName, streak]);
+  }, [userName]);
 };
 
 const useSpiritualQuotes = (currentCount: number, cycleCount: number) => {
@@ -133,7 +124,7 @@ export function HomeScreen({
     }
   }, [todayProgress, counter.dailyGoal]);
 
-  const livingGreeting = useLivingGreeting(userName, streak);
+  const livingGreeting = useLivingGreeting(userName);
   const { quote: currentQuote, isNew: quoteChangedByMala } = useSpiritualQuotes(currentCount, counter.cycleCount);
   
   // Volume key handlers with safety checks
@@ -272,9 +263,9 @@ export function HomeScreen({
 
 
   return (
-    <div className="h-screen bg-gradient-to-br from-[#FDF6E3] to-[#FAF0E6] dark:from-gray-900 dark:to-gray-800 overflow-hidden flex flex-col relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#FDF6E3] to-[#FAF0E6] dark:from-gray-900 dark:to-gray-800 flex flex-col relative">
       {/* Subtle Background Ambiance */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <motion.div
           className="absolute top-20 right-10 w-64 h-64 bg-gradient-to-br from-[#D4AF37]/10 to-[#FFD700]/10 rounded-full blur-3xl"
           animate={{
@@ -317,54 +308,68 @@ export function HomeScreen({
 
       <HeaderComponent counterName={counter.name} todayProgress={todayProgress} dailyGoal={counter.dailyGoal} />
 
-      <div className="px-4 py-2" style={{ paddingTop: '100px' }}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="text-center">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1 tracking-tight">{livingGreeting}</h2>
-        </motion.div>
-      </div>
+      {/* Content area with proper spacing for fixed header */}
+      <div className="flex flex-col min-h-screen relative z-10" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 100px)' }}>
+        {/* Greeting */}
+        <div className="px-4 py-4 relative z-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.8, ease: "easeOut" }} 
+            className="text-center"
+          >
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-1 tracking-tight">{livingGreeting}</h2>
+          </motion.div>
+        </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden relative z-10">
-        <SpiritualQuoteDisplay quote={currentQuote} isNew={quoteChangedByMala} />
-
-        {/* Golden Logo above count */}
-        <motion.div 
-          className="mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.95 }}
-              onPointerDown={handleLongPressStart}
-              onPointerUp={handleLongPressEnd}
-              onPointerLeave={handleLongPressCancel}
-              onPointerCancel={handleLongPressCancel}
-              className="flex items-center justify-center p-2 rounded-full bg-white/60 dark:bg-white/10 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <GoldenLogo size="bright" animated={true} />
-            </motion.button>
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">-1</span>
+        {/* Main content: Quote, Logo, Counter */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-20 relative z-10">
+          {/* Spiritual Quote Card */}
+          <div className="mb-6 w-full max-w-md">
+            <SpiritualQuoteDisplay quote={currentQuote} isNew={quoteChangedByMala} />
           </div>
-        </motion.div>
 
-        <motion.div 
-          className="relative cursor-pointer select-none flex-shrink-0"
-          ref={tapAreaRef}
-          whileTap={{ scale: 0.97 }}
-          onClick={(event) => handleIncrement(event)}
-        >
-          <RippleLayer ripples={state.ripples} onRippleEnd={(id) => dispatch({ type: 'REMOVE_RIPPLE', payload: id })} />
-          <ProgressRing 
-            currentCount={currentCount}
-            cycleCount={counter.cycleCount}
-          />
-          <CountDisplay
-            currentCount={currentCount}
-            cycleCount={counter.cycleCount}
-          />
-        </motion.div>
+          {/* Golden Logo above count */}
+          <motion.div 
+            className="mb-6"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.95 }}
+                onPointerDown={handleLongPressStart}
+                onPointerUp={handleLongPressEnd}
+                onPointerLeave={handleLongPressCancel}
+                onPointerCancel={handleLongPressCancel}
+                className="flex items-center justify-center p-2 rounded-full bg-white/60 dark:bg-white/10 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <GoldenLogo size="bright" animated={true} />
+              </motion.button>
+              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">-1</span>
+            </div>
+          </motion.div>
+
+          {/* Circular Progress Counter */}
+          <motion.div 
+            className="relative cursor-pointer select-none flex-shrink-0 z-10"
+            ref={tapAreaRef}
+            whileTap={{ scale: 0.97 }}
+            onClick={(event) => handleIncrement(event)}
+          >
+            <RippleLayer ripples={state.ripples} onRippleEnd={(id) => dispatch({ type: 'REMOVE_RIPPLE', payload: id })} />
+            <ProgressRing 
+              currentCount={currentCount}
+              cycleCount={counter.cycleCount}
+            />
+            <CountDisplay
+              currentCount={currentCount}
+              cycleCount={counter.cycleCount}
+            />
+          </motion.div>
+        </div>
       </div>
       
       <ResetModal 
@@ -405,11 +410,26 @@ const HeaderComponent = React.memo(({ counterName, todayProgress, dailyGoal }: {
 
 
 const SpiritualQuoteDisplay = React.memo(({ quote, isNew }: { quote: string; isNew: boolean }) => (
-    <div className="mb-4 text-center max-w-md mx-auto">
-      <motion.div key={quote} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.8, ease: "easeOut" }}>
+    <div className="text-center w-full">
+      <motion.div 
+        key={quote} 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        exit={{ opacity: 0, y: -20 }} 
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      >
         <div className="relative bg-gradient-to-br from-white/40 via-white/30 to-white/20 dark:from-gray-800/40 dark:via-gray-800/30 dark:to-gray-800/20 backdrop-blur-md rounded-2xl p-6 shadow-xl shadow-gray-200/20 dark:shadow-gray-900/20 border border-white/30 dark:border-gray-700/30">
           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed italic">"{quote}"</p>
-          {isNew && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-3 text-xs font-medium text-[#D4AF37]">✨ New Wisdom ✨</motion.p>}
+          {isNew && (
+            <motion.p 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              transition={{ delay: 0.5 }} 
+              className="mt-3 text-xs font-medium text-[#D4AF37]"
+            >
+              ✨ New Wisdom ✨
+            </motion.p>
+          )}
         </div>
       </motion.div>
     </div>
@@ -533,9 +553,6 @@ const CountDisplay = React.memo(({ currentCount, cycleCount }: { currentCount: n
           >
             of {cycleCount}
           </motion.div>
-          <div className="mt-1 text-xs text-gray-500/60 font-medium">
-            {currentCount}/{cycleCount} current
-          </div>
         </div>
     );
 });
