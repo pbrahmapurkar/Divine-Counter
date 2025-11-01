@@ -277,10 +277,17 @@ export function SettingsScreen({
 
       <DeleteDataModal
         isOpen={isResetModalOpen}
-        onCancel={() => setResetModalOpen(false)}
-        onConfirm={() => {
-          onResetTutorial();
+        onCancel={() => {
+          console.log("[Settings] Reset modal cancelled");
           setResetModalOpen(false);
+        }}
+        onConfirm={() => {
+          console.log("[Settings] Reset modal confirmed - calling handleResetTutorial");
+          setResetModalOpen(false);
+          // Call reset handler after modal closes to ensure clean state
+          setTimeout(() => {
+            onResetTutorial();
+          }, 100);
         }}
       />
     </SafeAreaView>

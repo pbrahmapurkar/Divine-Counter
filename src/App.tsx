@@ -19,6 +19,7 @@ import { BootScreen } from "./components/BootScreen";
 import { WelcomingRitualStep1 } from "./components/WelcomingRitualStep1";
 import { WelcomingRitualStep2 } from "./components/WelcomingRitualStep2";
 import { WelcomingRitualStep3 } from "./components/WelcomingRitualStep3";
+import { ResetLoadingOverlay } from "./components/ResetLoadingOverlay";
 import { AddCounterModal } from "./components/AddCounterModal";
 import { EditPracticeScreen } from "./components/EditPracticeScreen";
 import { AddPracticeScreen } from "./components/AddPracticeScreen";
@@ -227,6 +228,7 @@ export default function App() {
   const [newReward, setNewReward] = useState(null as Reward | null);
   const [pendingRewards, setPendingRewards] = useState([] as Reward[]);
   const [longestStreak, setLongestStreak] = useState(0);
+  const [isResetting, setIsResetting] = useState(false);
   const notificationPermissionRequestedRef = useRef(false);
   const hasSyncedRemindersRef = useRef(false);
   const scrollToTop = useCallback(() => {
@@ -371,13 +373,32 @@ export default function App() {
   // Load data from localStorage on initial load
   useEffect(() => {
     if (!isBooting) {
+      console.log("[Load] Boot complete, checking localStorage for saved data...");
+      console.log("[Load] Current isOnboarding state:", isOnboarding);
+      
+      // CRITICAL: Check localStorage FIRST, regardless of isOnboarding state
+      // This ensures we properly restore the onboarding flag from storage
       const savedOnboarding = localStorage.getItem("divine-counter-onboarded");
-      if (savedOnboarding) {
-        setIsOnboarding(false);
+      console.log("[Load] divine-counter-onboarded in localStorage:", savedOnboarding);
+      
+      if (savedOnboarding === "true") {
+        // User has completed onboarding - load saved data
+        console.log("[Load] Found onboarding flag - user has completed onboarding, loading data...");
+        
+        // Only load if we're currently in onboarding mode (prevents re-hydration after explicit reset)
+        if (isOnboarding) {
+          console.log("[Load] Currently in onboarding mode but flag exists - switching to app mode");
+          setIsOnboarding(false);
+        }
+        
         const savedActiveCounterId = localStorage.getItem("divine-counter-active") || "";
+        console.log("[Load] Active counter ID:", savedActiveCounterId || "(none)");
+        
         const storedCounters = JSON.parse(localStorage.getItem("divine-counter-counters") || '[]');
         const hydratedCounters = storedCounters.map((counter: Counter) => hydrateCounter(counter));
+        console.log("[Load] Loaded", hydratedCounters.length, "counters");
         setCounters(hydratedCounters);
+        
         setCounterStates(JSON.parse(localStorage.getItem("divine-counter-states") || '{}'));
         const rawHistory = JSON.parse(localStorage.getItem("divine-counter-history") || '[]');
         const legacyFallbackId =
@@ -399,7 +420,7 @@ export default function App() {
           const parsedSettings = storedSettingsRaw ? JSON.parse(storedSettingsRaw) : null;
           setSettings(normalizeSettings(parsedSettings));
         } catch (error) {
-          console.warn("Failed to parse saved settings, falling back to defaults", error);
+          console.warn("[Load] Failed to parse saved settings, falling back to defaults", error);
           setSettings(normalizeSettings(null));
         }
         setActiveCounterId(savedActiveCounterId);
@@ -411,6 +432,15 @@ export default function App() {
           setMilestoneStore(hydrateMilestoneStore(JSON.parse(savedMilestoneState)));
         }
         setRewards(JSON.parse(localStorage.getItem("divine-counter-rewards") || JSON.stringify(REWARDS.map(reward => ({ ...reward, isUnlocked: false })))));
+        console.log("[Load] Data loaded successfully - user should see app, not onboarding");
+      } else {
+        // No onboarding flag - first launch or after reset
+        console.log("[Load] No onboarding flag found - user needs to complete onboarding");
+        if (!isOnboarding) {
+          console.warn("[Load] WARNING: isOnboarding is false but no flag in storage - this shouldn't happen");
+          console.warn("[Load] This might indicate a reset occurred. Setting isOnboarding=true");
+          setIsOnboarding(true);
+        }
       }
     }
   }, [isBooting]);
@@ -671,7 +701,13 @@ export default function App() {
     setOnboardingStep("affirmation");
   };
   const handleOnboardingComplete = async () => {
-    if (!onboardingData.practiceData) return;
+    console.log("[Onboarding] Completing onboarding...");
+    if (!onboardingData.practiceData) {
+      console.error("[Onboarding] ERROR: No practice data found");
+      return;
+    }
+    
+    console.log("[Onboarding] Setting up initial counter...");
     setUserName(onboardingData.userName);
     const counterId = generateUniqueIntId();
     const counter: Counter = {
@@ -700,7 +736,20 @@ export default function App() {
     setLongestStreak(0);
     setCurrentScreen("home");
     setOnboardingStep("greeting");
+    
+    // CRITICAL: Set onboarding to false BEFORE saving to localStorage
+    // This ensures the save useEffect will write the flag
+    console.log("[Onboarding] Setting isOnboarding=false - save useEffect should write divine-counter-onboarded flag");
     setIsOnboarding(false);
+    
+    // Force immediate write of onboarding flag (don't wait for useEffect)
+    try {
+      localStorage.setItem("divine-counter-onboarded", "true");
+      console.log("[Onboarding] Explicitly saved divine-counter-onboarded flag to localStorage");
+    } catch (error) {
+      console.error("[Onboarding] ERROR: Failed to save onboarding flag", error);
+    }
+    
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", window.location.pathname);
     }
@@ -709,6 +758,8 @@ export default function App() {
     if (counter.reminderEnabled) {
       await scheduleReminderForCounter(counter);
     }
+    
+    console.log("[Onboarding] Onboarding complete - user should now see app");
   };
 
   // Counter Actions - CORRECTED HAPTIC LOGIC
@@ -894,54 +945,137 @@ export default function App() {
   }, []);
   const handleSettingToggle = (setting: keyof Settings) => { setSettings(prev => ({ ...prev, [setting]: !prev[setting] })); };
   const handleResetTutorial = useCallback(() => {
-    const storageKeys = [
-      "divine-counter-onboarded",
-      "divine-counter-counters",
-      "divine-counter-states",
-      "divine-counter-history",
-      "divine-counter-journal",
-      "divine-counter-settings",
-      "divine-counter-active",
-      "divine-counter-username",
-      "divine-counter-unlocked-rewards",
-      "divine-counter-longest-streak",
-      "divine-counter-milestones",
-      "divine-counter-rewards",
-    ];
+    console.log("[Reset] ===== STARTING INSTANT RESET =====");
+    console.log("[Reset] Phase 1: Showing loading overlay...");
+    
+    // Show loading overlay immediately
+    setIsResetting(true);
+    
+    try {
+      // STEP 1: Set onboarding state IMMEDIATELY (synchronously, no delays)
+      // This prevents save useEffect from re-saving data
+      console.log("[Reset] Phase 2: Setting onboarding state to prevent re-save...");
+      setIsOnboarding(true);
+      setOnboardingStep("greeting");
+      setCurrentScreen("home");
+      
+      // STEP 2: Clear ALL localStorage keys (including custom mala features)
+      console.log("[Reset] Phase 3: Clearing localStorage...");
+      const storageKeys = [
+        "divine-counter-onboarded",
+        "divine-counter-counters",
+        "divine-counter-states",
+        "divine-counter-history",
+        "divine-counter-journal",
+        "divine-counter-settings",
+        "divine-counter-active",
+        "divine-counter-username",
+        "divine-counter-unlocked-rewards",
+        "divine-counter-longest-streak",
+        "divine-counter-milestones",
+        "divine-counter-rewards",
+        // Custom Mala Planner storage keys
+        "divine-counter-custom-mala-planner",
+        // Weekly Mala storage keys
+        "divine-counter-weekly-mala",
+        "divine-counter-daily-override",
+        // Additional progress tracking keys
+        "divine-counter-last-progress-reset",
+      ];
 
-    storageKeys.forEach((key) => localStorage.removeItem(key));
+      let clearedCount = 0;
+      storageKeys.forEach((key) => {
+        try {
+          localStorage.removeItem(key);
+          clearedCount++;
+        } catch (error) {
+          console.error(`[Reset] Failed to remove localStorage key ${key}:`, error);
+        }
+      });
+      console.log(`[Reset] Cleared ${clearedCount}/${storageKeys.length} localStorage keys`);
 
-    setIsNotificationPending(false);
-    setIsAddCounterModalOpen(false);
-    setShowRewardModal(false);
-    setPendingRewards([]);
-    setNewRewards([]);
-    setNewReward(null);
+      // STEP 3: Clear sessionStorage (if any data exists)
+      console.log("[Reset] Phase 4: Clearing sessionStorage...");
+      try {
+        sessionStorage.clear();
+        console.log("[Reset] sessionStorage cleared");
+      } catch (error) {
+        console.error("[Reset] Failed to clear sessionStorage:", error);
+      }
 
-    if (Capacitor.isNativePlatform()) {
-      LocalNotifications.cancel({ notifications: [] }).catch(error => console.error("Failed to cancel notifications during reset", error));
+      // STEP 4: Reset ALL React state IMMEDIATELY (synchronously, no setTimeout)
+      console.log("[Reset] Phase 5: Resetting React state...");
+      setIsNotificationPending(false);
+      setIsAddCounterModalOpen(false);
+      setShowRewardModal(false);
+      setPendingRewards([]);
+      setNewRewards([]);
+      setNewReward(null);
+
+      setCounters([]);
+      setActiveCounterId("");
+      setCounterStates({});
+      setHistory([]);
+      setJournalEntries([]);
+      setUnlockedRewards([]);
+      setStreak(0);
+      setLongestStreak(0);
+      setRewards(REWARDS.map(reward => ({ ...reward, isUnlocked: false })));
+      setMilestoneStore({});
+      setMilestones(hydrateMilestones());
+
+      setSettings(normalizeSettings(null));
+      setUserName("");
+      setOnboardingData({ userName: "" });
+      setEditingCounterId("");
+
+      // Reset refs
+      notificationPermissionRequestedRef.current = false;
+      hasSyncedRemindersRef.current = false;
+
+      console.log("[Reset] All React state reset synchronously");
+
+      // STEP 5: Cancel native notifications (async, but don't wait)
+      if (Capacitor.isNativePlatform()) {
+        console.log("[Reset] Phase 6: Cancelling native notifications...");
+        LocalNotifications.cancel({ notifications: [] })
+          .then(() => {
+            console.log("[Reset] Notifications cancelled successfully");
+          })
+          .catch((error) => {
+            console.error("[Reset] Failed to cancel notifications:", error);
+          });
+      }
+
+      // STEP 6: Verify storage is cleared
+      console.log("[Reset] Phase 7: Verifying storage cleared...");
+      const onboardedCheck = localStorage.getItem("divine-counter-onboarded");
+      if (onboardedCheck) {
+        console.warn("[Reset] WARNING: divine-counter-onboarded still exists after reset!");
+      } else {
+        console.log("[Reset] Verified: divine-counter-onboarded successfully removed");
+      }
+
+      // STEP 7: Trigger reload for fresh mount (after brief delay to show overlay)
+      console.log("[Reset] Phase 8: Triggering reload for fresh mount...");
+      console.log("[Reset] ===== RESET COMPLETE - RELOADING =====");
+      
+      // Use setTimeout with minimal delay just to let React render the overlay
+      // then reload for a completely fresh mount
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }, 100); // Minimal delay just for UX (show overlay briefly)
+
+    } catch (error) {
+      console.error("[Reset] CRITICAL ERROR during reset:", error);
+      setIsResetting(false);
+      // Still try to show onboarding even if reset partially failed
+      setIsOnboarding(true);
+      setOnboardingStep("greeting");
+      setCurrentScreen("home");
     }
-
-    setCounters([]);
-    setActiveCounterId("");
-    setCounterStates({});
-    setHistory([]);
-    setJournalEntries([]);
-    setUnlockedRewards([]);
-    setStreak(0);
-    setLongestStreak(0);
-    setRewards(REWARDS.map(reward => ({ ...reward, isUnlocked: false })));
-    setMilestoneStore({});
-    setMilestones(hydrateMilestones());
-
-    setSettings(normalizeSettings(null));
-    setUserName("");
-    setOnboardingData({ userName: "" });
-    setEditingCounterId("");
-
-    setIsOnboarding(true);
-    setOnboardingStep("greeting");
-    setCurrentScreen("home");
   }, []);
   const handleAddJournalEntry = (entry: JournalEntry) => { /* ... */ };
   
@@ -966,17 +1100,22 @@ export default function App() {
 
   if (isOnboarding) {
     return (
-      <div className="min-h-screen">
-        {onboardingStep === "greeting" && <WelcomingRitualStep1 onNext={handleGreetingNext} />}
-        {onboardingStep === "practice" && <WelcomingRitualStep2 userName={onboardingData.userName} onNext={handlePracticeNext} onBack={() => setOnboardingStep("greeting")} />}
-        {onboardingStep === "affirmation" && onboardingData.practiceData && <WelcomingRitualStep3 userName={onboardingData.userName} practiceData={onboardingData.practiceData} onComplete={handleOnboardingComplete} onBack={() => setOnboardingStep("practice")} />}
-      </div>
+      <>
+        <ResetLoadingOverlay isVisible={isResetting} />
+        <div className="min-h-screen">
+          {onboardingStep === "greeting" && <WelcomingRitualStep1 onNext={handleGreetingNext} />}
+          {onboardingStep === "practice" && <WelcomingRitualStep2 userName={onboardingData.userName} onNext={handlePracticeNext} onBack={() => setOnboardingStep("greeting")} />}
+          {onboardingStep === "affirmation" && onboardingData.practiceData && <WelcomingRitualStep3 userName={onboardingData.userName} practiceData={onboardingData.practiceData} onComplete={handleOnboardingComplete} onBack={() => setOnboardingStep("practice")} />}
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      <div className="pb-20">
+    <>
+      <ResetLoadingOverlay isVisible={isResetting} />
+      <div className="min-h-screen bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="pb-20">
         {currentScreen === "home" && activeCounter && activeCounterState && (
           <HomeScreen
             counter={activeCounter}
@@ -1107,5 +1246,6 @@ export default function App() {
         onClaim={handleClaimReward}
       />
     </div>
+    </>
   );
 }

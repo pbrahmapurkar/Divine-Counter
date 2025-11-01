@@ -63,15 +63,60 @@ export function DeleteDataModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={onCancel}
+            onMouseDown={(e) => {
+              // Only handle if clicking directly on backdrop (same element)
+              // Use nativeEvent to get the actual DOM target, not React's synthetic target
+              const nativeTarget = e.nativeEvent.target as HTMLElement;
+              const backdrop = e.currentTarget as HTMLElement;
+              
+              // Check if the native target is the backdrop element itself
+              if (nativeTarget === backdrop) {
+                console.log("[DeleteModal] Backdrop clicked directly - cancelling");
+                onCancel();
+              } else {
+                // Click originated from modal or other element, ignore
+                console.log("[DeleteModal] Click NOT on backdrop (target:", nativeTarget?.tagName, nativeTarget?.className, ") - ignoring");
+                e.stopPropagation();
+              }
+            }}
+            onTouchStart={(e) => {
+              const nativeTarget = e.nativeEvent.target as HTMLElement;
+              const backdrop = e.currentTarget as HTMLElement;
+              
+              if (nativeTarget === backdrop) {
+                console.log("[DeleteModal] Backdrop touched directly - cancelling");
+                onCancel();
+              } else {
+                console.log("[DeleteModal] Touch NOT on backdrop (target:", nativeTarget?.tagName, nativeTarget?.className, ") - ignoring");
+                e.stopPropagation();
+              }
+            }}
+            onClick={(e) => {
+              const nativeTarget = e.nativeEvent.target as HTMLElement;
+              const backdrop = e.currentTarget as HTMLElement;
+              
+              if (nativeTarget === backdrop) {
+                console.log("[DeleteModal] Backdrop onClick directly - cancelling");
+                onCancel();
+              } else {
+                console.log("[DeleteModal] onClick NOT on backdrop (target:", nativeTarget?.tagName, nativeTarget?.className, ") - ignoring");
+                e.stopPropagation();
+              }
+            }}
+            style={{ pointerEvents: 'auto' }}
             aria-hidden="true"
           />
 
-          {/* Modal Dialog */}
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+          {/* Modal Dialog Container - allows backdrop clicks through empty space */}
+          <div 
+            className="fixed inset-0 z-[101] flex items-center justify-center p-4"
+            style={{ pointerEvents: 'none' }}
+          >
             <motion.div
-              className="relative w-full max-w-[90%] sm:max-w-[400px] bg-gray-900/98 backdrop-blur-xl rounded-2xl overflow-hidden pointer-events-auto"
+              className="relative w-full max-w-[90%] sm:max-w-[400px] bg-gray-900/98 backdrop-blur-xl rounded-2xl overflow-hidden"
               style={{
+                zIndex: 102,
+                pointerEvents: 'auto',
                 boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
               }}
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -83,14 +128,27 @@ export function DeleteDataModal({
                 damping: 30,
                 mass: 0.8,
               }}
-              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="delete-data-title"
               aria-describedby="delete-data-description"
             >
               {/* Content */}
-              <div className="px-5 py-6 sm:px-6 sm:py-6">
+              <div 
+                className="px-5 py-6 sm:px-6 sm:py-6"
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {/* Glowing Golden Icon */}
                 <div className="flex justify-center mb-5">
                   <motion.div
@@ -142,28 +200,80 @@ export function DeleteDataModal({
                 </p>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3">
-                  {/* Cancel Button - Ghost */}
+                <div 
+                  className="flex gap-3" 
+                  style={{ position: 'relative', zIndex: 103 }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Delete Button - Golden (placed first for higher z-index) */}
                   <button
-                    onClick={onCancel}
-                    className="flex-1 px-4 py-3 rounded-xl bg-transparent border border-gray-700 text-gray-300 font-medium text-base hover:bg-gray-800/50 active:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 focus:ring-offset-gray-900"
-                    style={{ minHeight: '44px' }}
-                    aria-label="Cancel deletion"
-                  >
-                    Cancel
-                  </button>
-
-                  {/* Delete Button - Golden */}
-                  <button
-                    onClick={onConfirm}
-                    className="flex-1 px-4 py-3 rounded-xl bg-[#D4AF37] text-white font-semibold text-base hover:bg-[#caa634] active:bg-[#c09d2f] transition-all duration-200 shadow-lg shadow-[#D4AF37]/20 focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-gray-900"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("[DeleteModal] Delete everything button MOUSE DOWN");
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("[DeleteModal] Delete everything button TOUCH START");
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("[DeleteModal] Delete everything button CLICKED - CONFIRMING NOW");
+                      onConfirm();
+                    }}
+                    onPointerDown={(e) => {
+                      // Universal pointer event (works for mouse, touch, pen)
+                      e.stopPropagation();
+                    }}
+                    type="button"
+                    className="flex-1 px-4 py-3 rounded-xl bg-[#D4AF37] text-white font-semibold text-base hover:bg-[#caa634] active:bg-[#c09d2f] transition-all duration-200 shadow-lg shadow-[#D4AF37]/20 focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer touch-manipulation"
                     style={{
                       minHeight: '44px',
                       boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      zIndex: 104,
+                      position: 'relative',
                     }}
                     aria-label="Delete everything"
                   >
                     Delete everything
+                  </button>
+
+                  {/* Cancel Button - Ghost */}
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("[DeleteModal] Cancel button MOUSE DOWN");
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("[DeleteModal] Cancel button TOUCH START");
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("[DeleteModal] Cancel button CLICKED - CANCELLING NOW");
+                      onCancel();
+                    }}
+                    onPointerDown={(e) => {
+                      // Universal pointer event (works for mouse, touch, pen)
+                      e.stopPropagation();
+                    }}
+                    type="button"
+                    className="flex-1 px-4 py-3 rounded-xl bg-transparent border border-gray-700 text-gray-300 font-medium text-base hover:bg-gray-800/50 active:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer touch-manipulation"
+                    style={{ 
+                      minHeight: '44px',
+                      position: 'relative',
+                      zIndex: 103,
+                    }}
+                    aria-label="Cancel deletion"
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
