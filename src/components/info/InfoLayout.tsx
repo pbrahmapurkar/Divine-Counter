@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { SafeAreaView } from "../SafeAreaView";
 import { Header } from "../Header";
 
@@ -11,6 +11,17 @@ interface InfoPageShellProps {
 
 export function InfoPageShell({ title, subtitle, onBack, children }: InfoPageShellProps) {
   const contentPaddingTop = "calc(env(safe-area-inset-top, 0px) + 112px)";
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Ensure the content starts at the top whenever this shell appears
+    requestAnimationFrame(() => {
+      container.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }, [title]);
 
   return (
     <SafeAreaView className="relative flex min-h-screen flex-col bg-gradient-to-br from-background via-background to-orange-50/20 dark:to-orange-950/10">
@@ -22,7 +33,7 @@ export function InfoPageShell({ title, subtitle, onBack, children }: InfoPageShe
       />
 
       <main className="flex flex-1 flex-col" style={{ paddingTop: contentPaddingTop }}>
-        <div className="flex-1 overflow-y-auto px-4 pb-24 sm:px-6">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-24 sm:px-6">
           <article className="mx-auto max-w-3xl space-y-8">
             {children}
           </article>

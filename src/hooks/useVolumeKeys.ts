@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface VolumeKeyOptions {
   onVolumeUp?: () => void;
@@ -22,30 +22,39 @@ interface VolumeKeyOptions {
  * ```
  */
 export function useVolumeKeys({ onVolumeUp, onVolumeDown, enabled = true }: VolumeKeyOptions) {
+  const volumeUpRef = useRef(onVolumeUp);
+  const volumeDownRef = useRef(onVolumeDown);
+
   useEffect(() => {
-    // If volume keys are disabled, don't register event listeners
+    volumeUpRef.current = onVolumeUp;
+  }, [onVolumeUp]);
+
+  useEffect(() => {
+    volumeDownRef.current = onVolumeDown;
+  }, [onVolumeDown]);
+
+  useEffect(() => {
     if (!enabled) {
       console.log('🔇 Volume Button Control: DISABLED - No event listeners registered');
-      return;
+      return undefined;
     }
 
     console.log('🔊 Volume Button Control: ENABLED - Event listeners registered');
 
-    const handleVolumeUp = () => {
-      onVolumeUp?.();
+    const handleVolumeUpEvent = () => {
+      volumeUpRef.current?.();
     };
 
-    const handleVolumeDown = () => {
-      onVolumeDown?.();
+    const handleVolumeDownEvent = () => {
+      volumeDownRef.current?.();
     };
 
-    // Listen for custom events dispatched from Android MainActivity
-    window.addEventListener('volume-up', handleVolumeUp);
-    window.addEventListener('volume-down', handleVolumeDown);
+    window.addEventListener('volume-up', handleVolumeUpEvent);
+    window.addEventListener('volume-down', handleVolumeDownEvent);
 
     return () => {
-      window.removeEventListener('volume-up', handleVolumeUp);
-      window.removeEventListener('volume-down', handleVolumeDown);
+      window.removeEventListener('volume-up', handleVolumeUpEvent);
+      window.removeEventListener('volume-down', handleVolumeDownEvent);
     };
-  }, [enabled, onVolumeUp, onVolumeDown]);
+  }, [enabled]);
 }

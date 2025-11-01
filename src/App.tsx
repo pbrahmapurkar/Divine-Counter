@@ -41,6 +41,59 @@ const hydrateMilestones = (savedMilestones?: StreakMilestone[]): StreakMilestone
   });
 };
 
+const LEGACY_MILESTONE_KEY = "__legacy__";
+
+const hydrateMilestoneStore = (saved?: unknown): Record<string, StreakMilestone[]> => {
+  if (!saved) {
+    return {};
+  }
+
+  if (Array.isArray(saved)) {
+    return {
+      [LEGACY_MILESTONE_KEY]: hydrateMilestones(saved),
+    };
+  }
+
+  if (typeof saved === "object" && saved !== null) {
+    return Object.entries(saved as Record<string, StreakMilestone[]>).reduce<Record<string, StreakMilestone[]>>(
+      (accumulator, [practiceId, value]) => {
+        if (Array.isArray(value)) {
+          accumulator[practiceId] = hydrateMilestones(value);
+        } else {
+          accumulator[practiceId] = hydrateMilestones();
+        }
+        return accumulator;
+      },
+      {}
+    );
+  }
+
+  return {};
+};
+
+const areMilestonesEqual = (
+  a: StreakMilestone[] | undefined,
+  b: StreakMilestone[]
+): boolean => {
+  if (!a || a.length !== b.length) {
+    return false;
+  }
+
+  for (let index = 0; index < a.length; index += 1) {
+    const previous = a[index];
+    const next = b[index];
+    if (
+      previous.days !== next.days ||
+      previous.isAchieved !== next.isAchieved ||
+      (previous.achievedAt ?? "") !== (next.achievedAt ?? "")
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const parseReminderTime = (time: string): { hour: number; minute: number } | null => {
   if (!time || typeof time !== "string") return null;
   const [hourStr, minuteStr] = time.split(":");
@@ -159,6 +212,7 @@ export default function App() {
   
   // Reward System State
   const [rewards, setRewards] = useState(REWARDS.map(reward => ({ ...reward, isUnlocked: false })) as Reward[]);
+  const [milestoneStore, setMilestoneStore] = useState<Record<string, StreakMilestone[]>>({});
   const [milestones, setMilestones] = useState(() => hydrateMilestones());
   const [unlockedRewards, setUnlockedRewards] = useState([] as string[]);
   const [showRewardModal, setShowRewardModal] = useState(false);
@@ -168,6 +222,23 @@ export default function App() {
   const [longestStreak, setLongestStreak] = useState(0);
   const notificationPermissionRequestedRef = useRef(false);
   const hasSyncedRemindersRef = useRef(false);
+  const scrollToTop = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const performScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+      if (typeof document !== "undefined") {
+        document.body?.scrollTo?.({ top: 0, left: 0, behavior: "auto" });
+        document.documentElement?.scrollTo?.({ top: 0, left: 0, behavior: "auto" });
+      }
+    };
+
+    // Allow layout to settle before resetting scroll
+    requestAnimationFrame(performScroll);
+  }, []);
 
   const ensureNotificationPermissions = useCallback(async () => {
     if (!Capacitor.isNativePlatform()) {
@@ -208,6 +279,10 @@ export default function App() {
       console.error("Failed to cancel reminder", error);
     }
   }, []);
+
+  useEffect(() => {
+    scrollToTop();
+  }, [currentScreen, scrollToTop]);
 
   const scheduleReminderForCounter = useCallback(async (counter: Counter) => {
     if (!Capacitor.isNativePlatform()) {
@@ -317,8 +392,10 @@ export default function App() {
         setUserName(localStorage.getItem("divine-counter-username") || "");
         setUnlockedRewards(JSON.parse(localStorage.getItem("divine-counter-unlocked-rewards") || '[]'));
         setLongestStreak(parseInt(localStorage.getItem("divine-counter-longest-streak") || '0'));
-        const savedMilestones = localStorage.getItem("divine-counter-milestones");
-        setMilestones(hydrateMilestones(savedMilestones ? JSON.parse(savedMilestones) : undefined));
+        const savedMilestoneState = localStorage.getItem("divine-counter-milestones");
+        if (savedMilestoneState) {
+          setMilestoneStore(hydrateMilestoneStore(JSON.parse(savedMilestoneState)));
+        }
         setRewards(JSON.parse(localStorage.getItem("divine-counter-rewards") || JSON.stringify(REWARDS.map(reward => ({ ...reward, isUnlocked: false })))));
       }
     }
@@ -337,10 +414,10 @@ export default function App() {
     localStorage.setItem("divine-counter-username", userName);
     localStorage.setItem("divine-counter-unlocked-rewards", JSON.stringify(unlockedRewards));
     localStorage.setItem("divine-counter-longest-streak", longestStreak.toString());
-    localStorage.setItem("divine-counter-milestones", JSON.stringify(milestones));
+    localStorage.setItem("divine-counter-milestones", JSON.stringify(milestoneStore));
     localStorage.setItem("divine-counter-rewards", JSON.stringify(rewards));
     }
-  }, [counters, counterStates, history, journalEntries, settings, activeCounterId, userName, isOnboarding, isBooting, milestones, rewards, unlockedRewards, longestStreak]);
+  }, [counters, counterStates, history, journalEntries, settings, activeCounterId, userName, isOnboarding, isBooting, milestoneStore, rewards, unlockedRewards, longestStreak]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
@@ -504,29 +581,71 @@ export default function App() {
       return;
     }
 
-    setMilestones((previousMilestones) => {
-      const { currentStreak: calculatedStreak, milestones: updatedMilestones } = calculateAndUpdateStreak(
-        history,
-        previousMilestones
-      );
+    if (!activeCounterId) {
+      setMilestones(hydrateMilestones());
+      setStreak(0);
+      setLongestStreak(0);
+      return;
+    }
 
-      setStreak(calculatedStreak);
-      setLongestStreak((prev) => Math.max(prev, calculatedStreak));
+    const activeCounter = counters.find(counter => counter.id === activeCounterId);
+    if (!activeCounter) {
+      return;
+    }
 
-      updatedMilestones.forEach((milestone, index) => {
-        const wasAchieved = previousMilestones[index]?.isAchieved;
-        if (!wasAchieved && milestone.isAchieved) {
-          toast.success(`🎉 Milestone Achieved! ${milestone.days}-day streak unlocked.`);
-        }
+    const todayState = counterStates[activeCounterId];
+    const practiceHistory = history.filter(entry => entry.practiceId === activeCounterId);
+    const storedMilestones =
+      milestoneStore[activeCounterId] ??
+      milestoneStore[LEGACY_MILESTONE_KEY] ??
+      hydrateMilestones();
+
+    const {
+      currentStreak: calculatedStreak,
+      longestStreak: calculatedLongestStreak,
+      milestones: updatedMilestones,
+      newlyAchieved
+    } = calculateAndUpdateStreak(
+      practiceHistory,
+      storedMilestones,
+      {
+        todayProgress: todayState?.todayProgress ?? 0,
+        dailyGoal: activeCounter.dailyGoal,
+      }
+    );
+
+    setStreak(calculatedStreak);
+    setLongestStreak(calculatedLongestStreak);
+    setMilestones(previous => (areMilestonesEqual(previous, updatedMilestones) ? previous : updatedMilestones));
+
+    if (newlyAchieved.length > 0) {
+      newlyAchieved.forEach((milestone) => {
+        toast.success(`🎉 Milestone Achieved! ${milestone.days}-day streak unlocked.`);
       });
+    }
 
-      if (updatedMilestones === previousMilestones) {
-        return previousMilestones;
+    setMilestoneStore((previousStore) => {
+      const previousMilestonesForPractice =
+        previousStore[activeCounterId] ?? previousStore[LEGACY_MILESTONE_KEY];
+
+      const shouldUpdate = !areMilestonesEqual(previousMilestonesForPractice, updatedMilestones);
+      const legacyPresent = Boolean(previousStore[LEGACY_MILESTONE_KEY]);
+
+      if (!shouldUpdate && !legacyPresent) {
+        return previousStore;
       }
 
-      return updatedMilestones;
+      const nextStore = { ...previousStore };
+      if (shouldUpdate || !nextStore[activeCounterId]) {
+        nextStore[activeCounterId] = updatedMilestones;
+      }
+      if (legacyPresent && activeCounterId !== LEGACY_MILESTONE_KEY) {
+        delete nextStore[LEGACY_MILESTONE_KEY];
+      }
+
+      return nextStore;
     });
-  }, [history, isOnboarding]);
+  }, [history, counterStates, activeCounterId, counters, milestoneStore, isOnboarding]);
 
   // Onboarding handlers (No Changes)
   const handleGreetingNext = (name: string) => {
@@ -554,6 +673,17 @@ export default function App() {
     setCounters([counter]);
     setActiveCounterId(counter.id);
     setCounterStates({ [counter.id]: { currentCount: 0, todayProgress: 0, lastCountDate: new Date().toDateString() } });
+    setMilestoneStore(prev => {
+      const next = { ...prev };
+      next[counter.id] = hydrateMilestones();
+      if (next[LEGACY_MILESTONE_KEY]) {
+        delete next[LEGACY_MILESTONE_KEY];
+      }
+      return next;
+    });
+    setMilestones(hydrateMilestones());
+    setStreak(0);
+    setLongestStreak(0);
     setCurrentScreen("home");
     setOnboardingStep("greeting");
     setIsOnboarding(false);
@@ -664,6 +794,16 @@ export default function App() {
       },
     }));
     setActiveCounterId(newCounter.id);
+    setMilestoneStore(prev => {
+      const next = { ...prev, [newCounter.id]: hydrateMilestones() };
+      if (next[LEGACY_MILESTONE_KEY]) {
+        delete next[LEGACY_MILESTONE_KEY];
+      }
+      return next;
+    });
+    setMilestones(hydrateMilestones());
+    setStreak(0);
+    setLongestStreak(0);
 
     if (newCounter.reminderEnabled) {
       await scheduleReminderForCounter(newCounter);
@@ -698,6 +838,13 @@ export default function App() {
     setCounters(remainingCounters);
     setCounterStates(prev => {
       const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setMilestoneStore(prev => {
+      if (!(id in prev)) {
+        return prev;
+      }
+      const { [id]: _removedMilestones, ...rest } = prev;
       return rest;
     });
 
@@ -770,6 +917,7 @@ export default function App() {
     setStreak(0);
     setLongestStreak(0);
     setRewards(REWARDS.map(reward => ({ ...reward, isUnlocked: false })));
+    setMilestoneStore({});
     setMilestones(hydrateMilestones());
 
     setSettings({ hapticsEnabled: true });

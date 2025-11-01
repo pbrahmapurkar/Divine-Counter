@@ -121,6 +121,17 @@ export function HomeScreen({
   const tapAreaRef = useRef<HTMLDivElement>(null);
   const longPressTimeoutRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const goalReachedToastShownRef = useRef(false);
+
+  useEffect(() => {
+    goalReachedToastShownRef.current = false;
+  }, [counter.id, counter.dailyGoal]);
+
+  useEffect(() => {
+    if (counter.dailyGoal <= 0 || todayProgress < counter.dailyGoal) {
+      goalReachedToastShownRef.current = false;
+    }
+  }, [todayProgress, counter.dailyGoal]);
 
   const livingGreeting = useLivingGreeting(userName, streak);
   const { quote: currentQuote, isNew: quoteChangedByMala } = useSpiritualQuotes(currentCount, counter.cycleCount);
@@ -134,15 +145,21 @@ export function HomeScreen({
       return;
     }
 
-    // Check if goal is already reached
-    if (todayProgress >= counter.dailyGoal) {
+    const hasDailyGoal = counter.dailyGoal > 0;
+    const goalReached = hasDailyGoal && todayProgress >= counter.dailyGoal;
+    const goalJustAcknowledged = goalReached && !goalReachedToastShownRef.current;
+
+    if (goalJustAcknowledged) {
       toast.success('Goal reached 🎉');
       successHaptic();
-      return;
+      goalReachedToastShownRef.current = true;
     }
 
     onIncrement();
-    lightHaptic();
+
+    if (!goalJustAcknowledged) {
+      lightHaptic();
+    }
   }, [counter, todayProgress, onIncrement]);
 
   const handleVolumeDown = useCallback(() => {

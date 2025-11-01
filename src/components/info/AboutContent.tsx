@@ -21,38 +21,64 @@ export function AboutContent({ variant = "sheet" }: AboutContentProps) {
             isPage ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl"
           }`}
         >
-          About Divine Counter
+          🌿 About Divine Counter
         </h1>
-        <p className="text-sm font-medium uppercase tracking-[0.28em] text-[#D4AF37]/80 sm:text-base">
-          Sacred Simplicity. Modern Stillness.
+        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+          A mindful way to count what truly matters.
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Divine Counter is a mindful companion for your daily practice — designed to make every count feel meaningful. Each tap becomes a breath; each session, a moment of calm.
+          Divine Counter brings calm and presence to your daily mantra or mala practice — blending simplicity, soft visuals, and gentle haptics so every count feels sacred and intentional.
         </p>
       </div>
 
-      <InfoSection title="Mindful by Design">
-        <p>
-          Created with intention, it blends ancient ritual with modern design — gentle haptics, soft glows, and fluid motion invite focus and presence.
+      <InfoSection title="🕊️ How It Works">
+        <p className="mb-4">
+          Your journey flows through four serene spaces:
         </p>
-        <p>
-          Whether you’re reciting mantras, counting breaths, or tracking affirmations, Divine Counter adapts to your rhythm and honors the sacred pace you set.
+        <div className="space-y-3">
+          <p>
+            <span className="font-semibold text-foreground">Home</span> – Begin your practice with quotes and a glowing counting ring that responds to each tap or haptic pulse.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Journey</span> – Reflect on your streaks, milestones, and daily progress through simple insights.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Counters</span> – Manage multiple practices with custom colors, goals, and sacred symbols.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Settings</span> – Adjust reminders, haptics, and privacy-first options.
+          </p>
+        </div>
+        <p className="mt-4 italic text-muted-foreground">
+          Each tap — or press of the volume key — becomes a small act of awareness.
         </p>
       </InfoSection>
 
-      <InfoSection title="About the Creator">
+      <InfoSection title="✨ Rewards & Milestones">
         <p>
-          Pratik Brahmapurkar is a developer and author devoted to mindful design.
+          Celebrate consistency with gentle rewards like new themes, symbols, and background patterns that honor your devotion and progress.
+        </p>
+      </InfoSection>
+
+      <InfoSection title="🧘‍♂️ Your Data, Your Space">
+        <p>
+          Built with a privacy-first philosophy, Divine Counter stores all data locally.
         </p>
         <p>
-          His work bridges technology and stillness, crafting digital experiences that feel calm, intentional, and soulful.
+          No accounts. No tracking. No distractions — just your practice, protected and personal.
+        </p>
+      </InfoSection>
+
+      <InfoSection title="💫 About the Creator">
+        <p>
+          Pratik Brahmapurkar is a certified yoga teacher, author, and mindful technologist whose work bridges ancient wisdom with modern design.
         </p>
         <p>
           He is the author of{" "}
           <span className="font-semibold text-foreground">
             <span className="italic">Asanas in the Ganges: A Journey of Transformation Through Yoga and Self-Discovery</span>
           </span>
-          , a reflection on inner growth and the practice of awareness through movement.
+          .
         </p>
         <button
           type="button"
@@ -64,9 +90,19 @@ export function AboutContent({ variant = "sheet" }: AboutContentProps) {
           className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#D4AF37] underline decoration-dotted underline-offset-4 transition hover:text-[#b8902f]"
         >
           <span aria-hidden="true">📖</span>
-          <span>Read Asanas in the Ganges on Amazon →</span>
+          <span>Read on Amazon →</span>
         </button>
+      </InfoSection>
+
+      <InfoSection title="☕ Support the Journey">
+        <p>
+          If Divine Counter enriches your practice, support its growth through Buy Me a Coffee or PayPal in Settings → Support.
+        </p>
+        <p>
+          Your contribution keeps it ad-free, offline, and purely mindful.
+        </p>
       </InfoSection>
     </InfoArticle>
   );
 }
+

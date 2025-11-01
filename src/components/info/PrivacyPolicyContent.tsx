@@ -65,8 +65,8 @@ export function PrivacyPolicyContent({ effectiveDate = DEFAULT_DATE }: PrivacyPo
           </p>
           <p>
             <span aria-hidden="true">🌐</span>{" "}
-            <a href="https://misterpb.in" target="_blank" rel="noopener noreferrer" className="font-medium text-[#D4AF37] hover:text-[#b8902f]">
-              Website: https://misterpb.in
+            <a href="https://misterpb.in/privacy/divine-counter" target="_blank" rel="noopener noreferrer" className="font-medium text-[#D4AF37] hover:text-[#b8902f]">
+              Website: https://misterpb.in/privacy/divine-counter
             </a>
           </p>
         </div>

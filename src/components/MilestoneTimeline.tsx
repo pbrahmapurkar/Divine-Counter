@@ -20,8 +20,8 @@ export function MilestoneTimeline({
   const hydratedMilestones = milestones.length ? milestones : [];
   const orderedMilestones = [...hydratedMilestones].sort((a, b) => a.days - b.days);
   
-  const nextMilestone = orderedMilestones.find(m => !m.isAchieved && m.days > currentStreak);
-  const achievedMilestones = orderedMilestones.filter(m => m.isAchieved || currentStreak >= m.days);
+  const nextMilestone = orderedMilestones.find(m => !m.isAchieved);
+  const achievedMilestones = orderedMilestones.filter(m => m.isAchieved);
   const lastAchievedMilestone = achievedMilestones[achievedMilestones.length - 1];
 
   const getProgressMessage = () => {
@@ -32,7 +32,7 @@ export function MilestoneTimeline({
       return "Your first milestone awaits";
     }
     if (nextMilestone) {
-      const remaining = nextMilestone.days - currentStreak;
+      const remaining = Math.max(nextMilestone.days - currentStreak, 0);
       return `You're ${remaining} day${remaining === 1 ? '' : 's'} from your next milestone`;
     }
     return "All milestones achieved! Your dedication is inspiring";

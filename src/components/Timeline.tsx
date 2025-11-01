@@ -10,18 +10,21 @@ interface TimelineProps {
   className?: string;
 }
 
+type TimelineStatus = 'unlocked' | 'in-progress' | 'locked';
+
 interface TimelineItemProps {
   milestone: StreakMilestone;
   index: number;
-  isUnlocked: boolean;
-  isActive: boolean;
+  status: TimelineStatus;
   isLeft: boolean;
   currentStreak: number;
+  previousMilestoneDays: number;
   onMilestoneClick?: (milestone: StreakMilestone) => void;
 }
 
 export function Timeline({ milestones, currentStreak, onMilestoneClick, className = "" }: TimelineProps) {
   const orderedMilestones = [...milestones].sort((a, b) => a.days - b.days);
+  const firstIncompleteIndex = orderedMilestones.findIndex((milestone) => !milestone.isAchieved);
   
   if (orderedMilestones.length === 0) {
     return (
@@ -49,19 +52,27 @@ export function Timeline({ milestones, currentStreak, onMilestoneClick, classNam
       {/* Timeline Items */}
       <div className="space-y-6 sm:space-y-8 lg:space-y-12">
         {orderedMilestones.map((milestone, index) => {
-          const isUnlocked = milestone.isAchieved || currentStreak >= milestone.days;
-          const isActive = !isUnlocked && currentStreak >= milestone.days - 3; // Next few milestones
+          let status: TimelineStatus = 'locked';
+          if (milestone.isAchieved) {
+            status = 'unlocked';
+          } else if (firstIncompleteIndex === index) {
+            status = 'in-progress';
+          } else {
+            status = 'locked';
+          }
+
           const isLeft = index % 2 === 0;
+          const previousMilestoneDays = index > 0 ? orderedMilestones[index - 1].days : 0;
 
           return (
             <TimelineItem
               key={milestone.days}
               milestone={milestone}
               index={index}
-              isUnlocked={isUnlocked}
-              isActive={isActive}
+              status={status}
               isLeft={isLeft}
               currentStreak={currentStreak}
+              previousMilestoneDays={previousMilestoneDays}
               onMilestoneClick={onMilestoneClick}
             />
           );
@@ -71,38 +82,55 @@ export function Timeline({ milestones, currentStreak, onMilestoneClick, classNam
   );
 }
 
-function TimelineItem({ 
-  milestone, 
-  index, 
-  isUnlocked, 
-  isActive, 
-  isLeft, 
-  currentStreak, 
-  onMilestoneClick 
+function TimelineItem({
+  milestone,
+  index,
+  status,
+  isLeft,
+  currentStreak,
+  previousMilestoneDays,
+  onMilestoneClick
 }: TimelineItemProps) {
-  const daysRemaining = Math.max(milestone.days - currentStreak, 0);
+  const isUnlocked = status === 'unlocked';
+  const isActive = status === 'in-progress';
+  const cappedStreak = Math.min(Math.max(currentStreak, 0), milestone.days);
+  const progressCurrent = isUnlocked ? milestone.days : cappedStreak;
+  const daysRemaining = Math.max(milestone.days - progressCurrent, 0);
   const accentColor = milestone.color || '#D4AF37';
   
   const getStatusLabel = () => {
-    if (isUnlocked) return 'Unlocked';
-    if (isActive) return 'In Progress';
-    return 'Locked';
+    switch (status) {
+      case 'unlocked':
+        return 'Unlocked';
+      case 'in-progress':
+        return 'In Progress';
+      default:
+        return 'Locked';
+    }
   };
 
   const getStatusColor = () => {
-    if (isUnlocked) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-    if (isActive) return 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/30';
-    return 'text-muted-foreground bg-muted/50 border-muted-foreground/20';
+    switch (status) {
+      case 'unlocked':
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      case 'in-progress':
+        return 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/30';
+      default:
+        return 'text-muted-foreground bg-muted/50 border-muted-foreground/20';
+    }
   };
 
   const getDescription = () => {
-    if (isUnlocked) {
+    if (status === 'unlocked') {
       return milestone.description || 'Milestone achieved. Beautiful work!';
     }
-    if (isActive) {
+    if (status === 'in-progress') {
       return daysRemaining === 0 
         ? 'You\'re so close! Keep going!' 
         : `Just ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} to go`;
+    }
+    if (previousMilestoneDays > 0) {
+      return `Complete the ${previousMilestoneDays}-day milestone to begin this goal. Unlocks at ${milestone.days} days.`;
     }
     return `Unlock at ${milestone.days} day${milestone.days === 1 ? '' : 's'} streak`;
   };
@@ -222,17 +250,22 @@ function TimelineItem({
             </p>
 
             {/* Progress indicator for active milestones */}
-            {isActive && daysRemaining > 0 && (
+            {isActive && (
               <div className="space-y-2">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Progress</span>
-                  <span>{currentStreak} / {milestone.days}</span>
+                  <span>{progressCurrent} / {Math.max(milestone.days, 1)}</span>
                 </div>
                 <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
                   <motion.div
                     className="h-full bg-gradient-to-r from-[#D4AF37] to-orange-500 rounded-full"
                     initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, (currentStreak / milestone.days) * 100)}%` }}
+                    animate={{
+                      width: `${Math.min(
+                        100,
+                        milestone.days > 0 ? (progressCurrent / milestone.days) * 100 : 0
+                      )}%`
+                    }}
                     transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
                   />
                 </div>
