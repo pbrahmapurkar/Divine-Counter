@@ -1,6 +1,6 @@
 {
       "name": "Mantra Counting App Design (Community)",
-      "version": "1.0.7",
+      "version": "1.7.7",
       "private": true,
       "dependencies": {
             "@capacitor/android": "^6.1.2",

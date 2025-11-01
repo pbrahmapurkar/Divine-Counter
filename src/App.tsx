@@ -175,6 +175,16 @@ interface Settings {
   hapticsEnabled: boolean;
   enableVolumeKeys: boolean;
 }
+
+const DEFAULT_SETTINGS: Settings = {
+  hapticsEnabled: true,
+  enableVolumeKeys: false
+};
+
+const normalizeSettings = (value: Partial<Settings> | null | undefined): Settings => ({
+  hapticsEnabled: typeof value?.hapticsEnabled === "boolean" ? value.hapticsEnabled : DEFAULT_SETTINGS.hapticsEnabled,
+  enableVolumeKeys: typeof value?.enableVolumeKeys === "boolean" ? value.enableVolumeKeys : DEFAULT_SETTINGS.enableVolumeKeys
+});
 type OnboardingStep = "greeting" | "practice" | "affirmation";
 type AppScreen =
   | "home"
@@ -201,10 +211,7 @@ export default function App() {
   const [history, setHistory] = useState([] as HistoryEntry[]);
   const [journalEntries, setJournalEntries] = useState([] as JournalEntry[]);
   const [streak, setStreak] = useState(0);
-  const [settings, setSettings] = useState({
-    hapticsEnabled: true,
-    enableVolumeKeys: false
-  } as Settings);
+  const [settings, setSettings] = useState<Settings>(() => normalizeSettings(null));
   const [isAddCounterModalOpen, setIsAddCounterModalOpen] = useState(false);
   const [editingCounterId, setEditingCounterId] = useState("");
   const [onboardingData, setOnboardingData] = useState({ userName: "" } as { userName: string; practiceData?: any; });
@@ -387,7 +394,14 @@ export default function App() {
           : [];
         setHistory(normalizedHistory);
         setJournalEntries(JSON.parse(localStorage.getItem("divine-counter-journal") || '[]'));
-        setSettings(JSON.parse(localStorage.getItem("divine-counter-settings") || '{"hapticsEnabled":true,"enableVolumeKeys":false}'));
+        try {
+          const storedSettingsRaw = localStorage.getItem("divine-counter-settings");
+          const parsedSettings = storedSettingsRaw ? JSON.parse(storedSettingsRaw) : null;
+          setSettings(normalizeSettings(parsedSettings));
+        } catch (error) {
+          console.warn("Failed to parse saved settings, falling back to defaults", error);
+          setSettings(normalizeSettings(null));
+        }
         setActiveCounterId(savedActiveCounterId);
         setUserName(localStorage.getItem("divine-counter-username") || "");
         setUnlockedRewards(JSON.parse(localStorage.getItem("divine-counter-unlocked-rewards") || '[]'));
@@ -920,7 +934,7 @@ export default function App() {
     setMilestoneStore({});
     setMilestones(hydrateMilestones());
 
-    setSettings({ hapticsEnabled: true });
+    setSettings(normalizeSettings(null));
     setUserName("");
     setOnboardingData({ userName: "" });
     setEditingCounterId("");

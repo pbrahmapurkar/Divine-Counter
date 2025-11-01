@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 import { Header } from "./Header";
 import { SafeAreaView } from "./SafeAreaView";
 import { Platform } from "../core/platform";
+import { DeleteDataModal } from "./DeleteDataModal";
 
 type InfoSheetKey = "about" | "support" | "privacy" | "terms";
 
@@ -267,19 +268,15 @@ export function SettingsScreen({
           <div className="px-4 sm:px-6 pb-6">
             <div className="rounded-xl border border-border/10 bg-muted/5 px-3 sm:px-4 py-3 text-center">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                Divine Counter v1.0.7
+                Divine Counter v1.7.7
               </p>
             </div>
           </div>
         </div>
       </main>
 
-      <ConfirmationModal
-        open={isResetModalOpen}
-        title="Are you sure?"
-        description="This will permanently delete all your data, including your name, practices, history, and settings. You will return to the welcome screen."
-        confirmLabel="Confirm"
-        cancelLabel="Cancel"
+      <DeleteDataModal
+        isOpen={isResetModalOpen}
         onCancel={() => setResetModalOpen(false)}
         onConfirm={() => {
           onResetTutorial();

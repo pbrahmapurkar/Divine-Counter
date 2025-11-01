@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { Plus, Edit3, Trash2, Sun, Moon, Star, Flower, Triangle, Circle, Heart, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Header } from './Header';
+import { gentleHaptic } from '../utils/haptics';
 
 // Type definitions for mouse and touch events
 type ReactMouseEvent = React.MouseEvent<HTMLButtonElement>;
@@ -74,7 +75,7 @@ const ScrollView = ({ children }: { children: ReactNode }) => (
     style={{ 
       marginTop: '100px',
       paddingInline: 16, 
-      paddingBottom: 80 // Space for FAB
+      paddingBottom: 120 // Space for button + bottom nav + extra clearance
     }}
   >
     {children}
@@ -208,11 +209,23 @@ export function CountersScreen({
     setShowDeleteConfirm(null);
   };
 
-  const handleFABClick = () => {
+  const handleFABClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Navigate to add practice screen if available, otherwise open add counter modal
     if (onNavigateToAddPractice) {
       onNavigateToAddPractice();
     } else {
       onAddCounter();
+    }
+    
+    // Provide haptic feedback asynchronously (non-blocking)
+    try {
+      await gentleHaptic();
+    } catch (error) {
+      // Silently fail haptics - navigation already executed
+      console.debug('Haptic feedback failed:', error);
     }
   };
 
@@ -239,27 +252,40 @@ export function CountersScreen({
         />
         
         <ScrollView>
-          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-saffron/20 to-saffron/10 flex items-center justify-center mb-6">
-              <Flower size={32} className="text-saffron/60" />
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-6">
+              <Flower size={32} className="text-[#D4AF37]/60" />
             </div>
-            <h2 className="text-xl mb-2 text-foreground/80">Your sanctuary awaits</h2>
-            <p className="text-muted-foreground mb-8 max-w-sm">
-              Tap the '+' below to add your first spiritual practice and begin your journey.
+            <h2 className="text-xl font-semibold mb-2 text-foreground/90">Your sanctuary awaits</h2>
+            <p className="text-muted-foreground mb-8 max-w-sm leading-relaxed">
+              Create your first spiritual practice counter to begin tracking your daily meditation journey.
             </p>
           </div>
         </ScrollView>
         
-        {/* Floating Action Button */}
-        <motion.button
-          onClick={handleFABClick}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="fixed bottom-32 right-4 w-14 h-14 bg-saffron hover:bg-saffron-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group z-50"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        {/* Add Practice Counter Button */}
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-40"
+          style={{
+            paddingBottom: 'calc(env(safe-area-inset-bottom) + 88px)', // Bottom nav height (~72px) + extra spacing (16px)
+            paddingLeft: 'calc(env(safe-area-inset-left) + 16px)',
+            paddingRight: 'calc(env(safe-area-inset-right) + 16px)',
+            paddingTop: '20px'
+          }}
         >
-          <Plus size={24} className="group-hover:scale-110 transition-transform" />
-        </motion.button>
+          <motion.button
+            onClick={handleFABClick}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full h-12 bg-[#D4AF37] text-white rounded-full shadow-2xl shadow-[#D4AF37]/40 hover:shadow-2xl hover:shadow-[#D4AF37]/50 transition-all duration-200 flex items-center justify-center gap-2 font-semibold text-base relative overflow-hidden group focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#E5C158] active:bg-[#caa634] touch-manipulation cursor-pointer"
+            aria-label="Add Practice Counter"
+            style={{ minHeight: '48px', zIndex: 41 }}
+            type="button"
+          >
+            <Plus size={20} className="relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+            <span className="relative z-10">Add Practice Counter</span>
+          </motion.button>
+        </div>
       </SafeAreaView>
     );
   }
@@ -272,7 +298,7 @@ export function CountersScreen({
       />
       
       <ScrollView>
-        <div className="space-y-4 pt-4">
+        <div className="space-y-5 pt-6 pb-4">
           {counters.map((counter) => {
             const IconComponent = getIcon(counter.icon);
             const counterState = counterStates[counter.id];
@@ -291,8 +317,8 @@ export function CountersScreen({
                   className={`
                     relative bg-card rounded-xl border transition-all duration-300 cursor-pointer
                     ${isActive 
-                      ? 'border-2 shadow-lg shadow-saffron/20' 
-                      : 'border-border hover:border-saffron/30'
+                      ? 'border-2 shadow-lg shadow-[#D4AF37]/20' 
+                      : 'border-border/50 hover:border-[#D4AF37]/40'
                     }
                     ${isSwipped ? 'translate-x-[-120px]' : 'translate-x-0'}
                   `}
@@ -310,7 +336,7 @@ export function CountersScreen({
                     registerSwipeTracking(counter.id, event.clientX, event.clientY, "mouse");
                   }}
                 >
-                  <div className="p-5">
+                  <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         {/* Icon with color background */}
@@ -324,18 +350,18 @@ export function CountersScreen({
                           />
                         </div>
                         
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-medium text-lg">{counter.name}</h3>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-lg text-foreground/90">{counter.name}</h3>
                             {isActive && (
-                              <span className="px-2 py-0.5 bg-saffron/10 text-saffron text-xs rounded-full border border-saffron/20">
+                              <span className="px-2.5 py-0.5 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-medium rounded-full border border-[#D4AF37]/20 flex-shrink-0">
                                 Active
                               </span>
                             )}
                           </div>
                           
                           {/* Progress indicator */}
-                          <div className="text-sm text-muted-foreground mb-2">
+                          <div className="text-sm text-muted-foreground mb-3 font-medium">
                             {todayProgress > 0 ? (
                               <span>{todayProgress} of {counter.dailyGoal} cycles today</span>
                             ) : (
@@ -344,7 +370,7 @@ export function CountersScreen({
                           </div>
                           
                           {/* Progress bar */}
-                          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                          <div className="w-full bg-muted/60 rounded-full h-2 overflow-hidden">
                             <div 
                               className="h-full rounded-full transition-all duration-500"
                               style={{ 
@@ -357,11 +383,11 @@ export function CountersScreen({
                       </div>
                       
                       {/* Current count indicator */}
-                      <div className="text-xs text-muted-foreground text-right">
-                        <div className="opacity-50">← swipe</div>
+                      <div className="text-xs text-muted-foreground text-right flex-shrink-0 ml-2">
+                        <div className="opacity-40 mb-1">← swipe</div>
                         {currentCount > 0 && (
-                          <div className="mt-1">
-                            {currentCount}/{counter.cycleCount} current
+                          <div className="font-medium text-foreground/70">
+                            {currentCount}/{counter.cycleCount}
                           </div>
                         )}
                       </div>
@@ -403,16 +429,29 @@ export function CountersScreen({
         </div>
       </ScrollView>
       
-      {/* Floating Action Button */}
-      <motion.button
-        onClick={handleFABClick}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-32 right-4 w-14 h-14 bg-saffron hover:bg-saffron-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group z-50"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      {/* Add Practice Counter Button */}
+      <div 
+        className="fixed bottom-0 left-0 right-0 z-40"
+        style={{
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 88px)', // Bottom nav height (~72px) + extra spacing (16px)
+          paddingLeft: 'calc(env(safe-area-inset-left) + 16px)',
+          paddingRight: 'calc(env(safe-area-inset-right) + 16px)',
+          paddingTop: '20px'
+        }}
       >
-        <Plus size={24} className="group-hover:scale-110 transition-transform" />
-      </motion.button>
+        <motion.button
+          onClick={handleFABClick}
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full h-12 bg-[#D4AF37] text-white rounded-full shadow-2xl shadow-[#D4AF37]/40 hover:shadow-2xl hover:shadow-[#D4AF37]/50 transition-all duration-200 flex items-center justify-center gap-2 font-semibold text-base relative overflow-hidden group focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#E5C158] active:bg-[#caa634] touch-manipulation cursor-pointer"
+          aria-label="Add Practice Counter"
+          style={{ minHeight: '48px', zIndex: 41 }}
+          type="button"
+        >
+          <Plus size={20} className="relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+          <span className="relative z-10">Add Practice Counter</span>
+        </motion.button>
+      </div>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
@@ -468,17 +507,6 @@ export function CountersScreen({
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* Floating Action Button */}
-      <motion.button
-        onClick={handleFABClick}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-32 right-4 w-14 h-14 bg-saffron hover:bg-saffron-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group z-50"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        <Plus size={24} className="group-hover:scale-110 transition-transform" />
-      </motion.button>
     </SafeAreaView>
   );
 }
